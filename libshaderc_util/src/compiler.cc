@@ -341,6 +341,11 @@ std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Compile(
   options.generateDebugInfo = generate_debug_info_;
   options.disableOptimizer = true;
   options.optimizeSize = false;
+  options.emitNonSemanticShaderDebugInfo =
+      generate_debug_info_ && emit_non_semantic_debug_info_;
+  options.emitNonSemanticShaderDebugSource =
+      generate_debug_info_ && emit_non_semantic_debug_info_;
+
   // Note the call to GlslangToSpv also populates compilation_output_data.
   glslang::GlslangToSpv(*program.getIntermediate(used_shader_stage), spirv,
                         &options);
@@ -436,6 +441,10 @@ void Compiler::SetGenerateDebugInfo() {
       enabled_opt_passes_[i] = PassId::kNullPass;
     }
   }
+}
+
+void Compiler::SetEmitNonSemanticDebugInfo() {
+  emit_non_semantic_debug_info_ = true;
 }
 
 void Compiler::SetOptimizationLevel(Compiler::OptimizationLevel level) {

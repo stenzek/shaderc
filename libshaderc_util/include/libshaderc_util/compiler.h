@@ -195,6 +195,7 @@ class Compiler {
         warnings_as_errors_(false),
         suppress_warnings_(false),
         generate_debug_info_(false),
+        emit_non_semantic_debug_info_(false),
         enabled_opt_passes_(),
         target_env_(TargetEnv::Vulkan),
         target_env_version_(TargetEnvVersion::Default),
@@ -219,6 +220,10 @@ class Compiler {
   // Requests that the compiler place debug information into the object code,
   // such as identifier names and line numbers.
   void SetGenerateDebugInfo();
+
+  // Requests that the compiler emit non-semantic debug information.
+  // Requires VK_KHR_shader_non_semantic_info.
+  void SetEmitNonSemanticDebugInfo();
 
   // Sets the optimization level to the given level. Only the last one takes
   // effect if multiple calls of this method exist.
@@ -485,6 +490,10 @@ class Compiler {
   // When true, compilation will generate debug info with the binary SPIR-V
   // output.
   bool generate_debug_info_;
+
+  // When true and generate_debug_info_ is also set, generate non-semantic debug
+  // information.
+  bool emit_non_semantic_debug_info_;
 
   // Optimization passes to be applied.
   std::vector<PassId> enabled_opt_passes_;

@@ -317,7 +317,7 @@ SHADERC_EXPORT void shaderc_compile_options_set_source_language(
 
 // Sets the compiler mode to generate debug information in the output.
 SHADERC_EXPORT void shaderc_compile_options_set_generate_debug_info(
-    shaderc_compile_options_t options);
+    shaderc_compile_options_t options, bool enabled, bool enable_non_semantic);
 
 // Sets the compiler optimization level to the given level. Only the last one
 // takes effect if multiple calls of this function exist.
@@ -505,6 +505,10 @@ SHADERC_EXPORT void shaderc_compile_options_set_invert_y(
 // as a composition of max and min.
 SHADERC_EXPORT void shaderc_compile_options_set_nan_clamp(
     shaderc_compile_options_t options, bool enable);
+
+// Returns a string representation of the specified compilation status.
+SHADERC_EXPORT const char* shaderc_compilation_status_to_string(
+    shaderc_compilation_status status);
 
 // An opaque handle to the results of a call to any shaderc_compile_into_*()
 // function.

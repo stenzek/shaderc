@@ -418,8 +418,12 @@ void shaderc_compile_options_set_source_language(
 }
 
 void shaderc_compile_options_set_generate_debug_info(
-    shaderc_compile_options_t options) {
-  options->compiler.SetGenerateDebugInfo();
+    shaderc_compile_options_t options, bool enabled, bool enable_non_semantic) {
+  if (enabled) {
+    options->compiler.SetGenerateDebugInfo();
+    if (enable_non_semantic)
+      options->compiler.SetEmitNonSemanticDebugInfo();
+  }
 }
 
 void shaderc_compile_options_set_optimization_level(
@@ -589,6 +593,29 @@ shaderc_compiler_t shaderc_compiler_initialize() {
 
 void shaderc_compiler_release(shaderc_compiler_t compiler) {
   delete compiler;
+}
+
+const char* shaderc_compilation_status_to_string(shaderc_compilation_status status)
+{
+  static constexpr const std::pair<shaderc_compilation_status, const char*> status_names[] = {
+    {shaderc_compilation_status_success, "shaderc_compilation_status_success"},
+    {shaderc_compilation_status_invalid_stage, "shaderc_compilation_status_invalid_stage"},
+    {shaderc_compilation_status_compilation_error, "shaderc_compilation_status_compilation_error"},
+    {shaderc_compilation_status_internal_error, "shaderc_compilation_status_internal_error"},
+    {shaderc_compilation_status_null_result_object, "shaderc_compilation_status_null_result_object"},
+    {shaderc_compilation_status_invalid_assembly, "shaderc_compilation_status_invalid_assembly"},
+    {shaderc_compilation_status_validation_error, "shaderc_compilation_status_validation_error"},
+    {shaderc_compilation_status_transformation_error, "shaderc_compilation_status_transformation_error"},
+    {shaderc_compilation_status_configuration_error, "shaderc_compilation_status_configuration_error"},
+  };
+
+  for (const auto& it : status_names)
+  {
+    if (status == it.first)
+      return it.second;
+  }
+
+  return "shaderc_compilation_status_unknown";
 }
 
 namespace {

@@ -117,6 +117,9 @@ if(MSVC)
   endif()
 endif(MSVC)
 
+if(NOT WIN32)
+  add_definitions("-fvisibility=hidden")
+endif()
 
 # Configure subdirectories.
 # We depend on these for later projects, so they should come first.
@@ -124,7 +127,6 @@ add_subdirectory(third_party)
 
 add_subdirectory(libshaderc_util)
 add_subdirectory(libshaderc)
-add_subdirectory(glslc)
 if(${SHADERC_ENABLE_EXAMPLES})
     add_subdirectory(examples)
 endif()
@@ -158,5 +160,3 @@ function(define_pkg_config_file NAME LIBS)
 endfunction()
 
 define_pkg_config_file(shaderc -lshaderc_shared)
-define_pkg_config_file(shaderc_static "-lshaderc ${EXTRA_STATIC_PKGCONFIG_LIBS} -lshaderc_util")
-define_pkg_config_file(shaderc_combined -lshaderc_combined)
