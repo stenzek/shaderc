@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.17.2)
 
-project(shaderc)
+project(shaderc VERSION 2024.3 LANGUAGES C CXX)
 enable_testing()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -159,4 +159,31 @@ function(define_pkg_config_file NAME LIBS)
   endif()
 endfunction()
 
-define_pkg_config_file(shaderc -lshaderc_shared)
+#define_pkg_config_file(shaderc -lshaderc_shared)
+
+if(SHADERC_ENABLE_INSTALL)
+  include(CMakePackageConfigHelpers)
+  set(SHADERC_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Shaderc")
+  install(
+    EXPORT ShadercTargets
+    FILE ShadercTargets.cmake
+    NAMESPACE Shaderc::
+    DESTINATION "${SHADERC_INSTALL_CMAKEDIR}"
+  )
+  configure_package_config_file(ShadercConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/ShadercConfig.cmake"
+    INSTALL_DESTINATION "${SHADERC_INSTALL_CMAKEDIR}"
+  )
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/ShadercConfigVersion.cmake"
+    VERSION "${CMAKE_PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+  )
+  install(
+    FILES
+      "${CMAKE_CURRENT_BINARY_DIR}/ShadercConfig.cmake"
+      "${CMAKE_CURRENT_BINARY_DIR}/ShadercConfigVersion.cmake"
+      DESTINATION "${SHADERC_INSTALL_CMAKEDIR}"
+  )
+endif()
+

@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/ShadercTargets.cmake")
+
+check_required_components(Shaderc)
+
+get_target_property(TEMP_SHADERC_LOCATION Shaderc::shaderc_shared LOCATION)
+message(STATUS "Found Shaderc: ${TEMP_SHADERC_LOCATION}")
+unset(TEMP_SHADERC_LOCATION)
+

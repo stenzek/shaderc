@@ -27,8 +27,8 @@ set(SHADERC_SOURCES
 add_library(shaderc_shared SHARED ${SHADERC_SOURCES})
 shaderc_default_compile_options(shaderc_shared)
 target_include_directories(shaderc_shared
-    PUBLIC include
-    PRIVATE ${glslang_SOURCE_DIR}
+    PRIVATE include
+            ${glslang_SOURCE_DIR}
             ${SPIRV-Headers_SOURCE_DIR}/include)
 target_compile_definitions(shaderc_shared
     PRIVATE SHADERC_IMPLEMENTATION
@@ -47,6 +47,8 @@ if(SHADERC_ENABLE_INSTALL)
       ${CMAKE_INSTALL_INCLUDEDIR}/shaderc)
 
   install(TARGETS shaderc_shared
+    EXPORT ShadercTargets
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
