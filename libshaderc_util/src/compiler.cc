@@ -404,6 +404,79 @@ std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Compile(
   }
 }
 
+std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Optimize(
+    const void* spirv, size_t spirv_size, std::ostream* error_stream) const {
+  auto result_tuple =
+      std::make_tuple(false, std::vector<uint32_t>(), (size_t)0u);
+
+  if (spirv_size == 0 || spirv_size % sizeof(uint32_t)) {
+    *error_stream << "shaderc: input SPIR-V size is invalid\n";
+    return result_tuple;
+  }
+
+  if (enabled_opt_passes_.empty()) {
+    *error_stream << "shaderc: No optimization passes are enabled.\n";
+    return result_tuple;
+  }
+
+  bool& succeeded = std::get<0>(result_tuple);
+  std::vector<uint32_t>& compilation_output_data = std::get<1>(result_tuple);
+  size_t& compilation_output_data_size_in_bytes = std::get<2>(result_tuple);
+
+  const size_t word_count = spirv_size / sizeof(uint32_t);
+  compilation_output_data.resize(word_count);
+  std::memcpy(compilation_output_data.data(), spirv, spirv_size);
+
+  spvtools::OptimizerOptions opt_options;
+  opt_options.set_preserve_bindings(preserve_bindings_);
+
+  std::string opt_errors;
+  if (!SpirvToolsOptimize(target_env_, target_env_version_, enabled_opt_passes_,
+                          opt_options, &compilation_output_data, &opt_errors)) {
+    *error_stream << "shaderc: internal error: failed to optimize: "
+                  << opt_errors << "\n";
+    return result_tuple;
+  }
+
+  succeeded = true;
+  compilation_output_data_size_in_bytes =
+      compilation_output_data.size() * sizeof(compilation_output_data[0]);
+  return result_tuple;
+}
+
+std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Disassemble(
+    const void* spirv, size_t spirv_size, std::ostream* error_stream) const {
+  auto result_tuple =
+      std::make_tuple(false, std::vector<uint32_t>(), (size_t)0u);
+
+  if (spirv_size == 0 || spirv_size % sizeof(uint32_t)) {
+    *error_stream << "shaderc: input SPIR-V size is invalid\n";
+    return result_tuple;
+  }
+
+  std::vector<uint32_t> spirv_copy;
+  const size_t word_count = spirv_size / sizeof(uint32_t);
+  spirv_copy.resize(word_count);
+  std::memcpy(spirv_copy.data(), spirv, spirv_size);
+
+  std::string text_or_error;
+  if (!SpirvToolsDisassemble(target_env_, target_env_version_, spirv_copy,
+                             &text_or_error)) {
+    *error_stream << "shaderc: internal error: compilation succeeded but "
+                     "failed to disassemble: "
+                  << text_or_error << "\n";
+    return result_tuple;
+  }
+
+  bool& succeeded = std::get<0>(result_tuple);
+  std::vector<uint32_t>& compilation_output_data = std::get<1>(result_tuple);
+  size_t& compilation_output_data_size_in_bytes = std::get<2>(result_tuple);
+  succeeded = true;
+  compilation_output_data = ConvertStringToVector(text_or_error);
+  compilation_output_data_size_in_bytes = text_or_error.size();
+  return result_tuple;
+}
+
 void Compiler::AddMacroDefinition(const char* macro, size_t macro_length,
                                   const char* definition,
                                   size_t definition_length) {

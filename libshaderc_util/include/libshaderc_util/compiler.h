@@ -400,6 +400,14 @@ class Compiler {
       CountingIncluder& includer, OutputType output_type,
       std::ostream* error_stream, size_t* total_warnings, size_t* total_errors) const;
 
+  // Interface to optimizer.
+  std::tuple<bool, std::vector<uint32_t>, size_t> Optimize(
+      const void* spirv, size_t spirv_size, std::ostream* error_stream) const;
+
+  // Interface to disassembler.
+  std::tuple<bool, std::vector<uint32_t>, size_t> Disassemble(
+      const void* spirv, size_t spirv_size, std::ostream* error_stream) const;
+
   static EShMessages GetDefaultRules() {
     return static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules |
                                     EShMsgCascadingErrors);

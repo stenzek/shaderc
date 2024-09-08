@@ -836,3 +836,74 @@ bool shaderc_parse_version_profile(const char* str, int* version,
   // Be strict to return false.
   return false;
 }
+
+shaderc_compilation_result_t shaderc_optimize_spv(
+    const shaderc_compiler_t compiler, const void* spirv, size_t spirv_size,
+    const shaderc_compile_options_t additional_options) {
+  auto* result = new (std::nothrow) shaderc_compilation_result_vector;
+  if (!result) return nullptr;
+
+  bool compilation_succeeded = false;  // In case we exit early.
+  std::vector<uint32_t> compilation_output_data;
+  size_t compilation_output_data_size_in_bytes = 0u;
+  std::stringstream errors;
+
+  if (!compiler->initializer) return result;
+  TRY_IF_EXCEPTIONS_ENABLED {
+    if (additional_options) {
+      std::tie(compilation_succeeded, compilation_output_data,
+               compilation_output_data_size_in_bytes) =
+          additional_options->compiler.Optimize(
+              static_cast<const uint32_t*>(spirv), spirv_size, &errors);
+    } else {
+      shaderc_util::Compiler compiler;
+      compiler.SetOptimizationLevel(
+          shaderc_util::Compiler::OptimizationLevel::Performance);
+      std::tie(compilation_succeeded, compilation_output_data,
+               compilation_output_data_size_in_bytes) =
+          compiler.Optimize(static_cast<const uint32_t*>(spirv), spirv_size,
+                            &errors);
+    }
+
+    result->messages = errors.str();
+    if (compilation_succeeded) {
+      result->compilation_status = shaderc_compilation_status_success;
+      result->SetOutputData(std::move(compilation_output_data));
+      result->output_data_size = compilation_output_data_size_in_bytes;
+    }
+  }
+  CATCH_IF_EXCEPTIONS_ENABLED(...) {
+    result->compilation_status = shaderc_compilation_status_internal_error;
+  }
+  return result;
+}
+
+shaderc_compilation_result_t shaderc_disassemble_spv(
+    const shaderc_compiler_t compiler, const void* spirv, size_t spirv_size) {
+  auto* result = new (std::nothrow) shaderc_compilation_result_vector;
+  if (!result) return nullptr;
+
+  bool compilation_succeeded = false;  // In case we exit early.
+  std::vector<uint32_t> compilation_output_data;
+  size_t compilation_output_data_size_in_bytes = 0u;
+  std::stringstream errors;
+
+  if (!compiler->initializer) return result;
+  TRY_IF_EXCEPTIONS_ENABLED {
+    std::tie(compilation_succeeded, compilation_output_data,
+             compilation_output_data_size_in_bytes) =
+        shaderc_util::Compiler().Disassemble(
+            static_cast<const uint32_t*>(spirv), spirv_size, &errors);
+
+    result->messages = errors.str();
+    if (compilation_succeeded) {
+      result->compilation_status = shaderc_compilation_status_success;
+      result->SetOutputData(std::move(compilation_output_data));
+      result->output_data_size = compilation_output_data_size_in_bytes;
+    }
+  }
+  CATCH_IF_EXCEPTIONS_ENABLED(...) {
+    result->compilation_status = shaderc_compilation_status_internal_error;
+  }
+  return result;
+}

@@ -614,7 +614,16 @@ SHADERC_EXPORT void shaderc_get_spv_version(unsigned int* version, unsigned int*
 // the string can not be parsed. Returns true when the parsing succeeds. The
 // parsed version and profile are returned through arguments.
 SHADERC_EXPORT bool shaderc_parse_version_profile(const char* str, int* version,
-                                   shaderc_profile* profile);
+                                                  shaderc_profile* profile);
+
+// Optimizes previously-generated SPIR-V.
+SHADERC_EXPORT shaderc_compilation_result_t shaderc_optimize_spv(
+    const shaderc_compiler_t compiler, const void* spirv, size_t spirv_size,
+    const shaderc_compile_options_t additional_options);
+
+// Disassembles SPIR-V.
+SHADERC_EXPORT shaderc_compilation_result_t shaderc_disassemble_spv(
+    const shaderc_compiler_t compiler, const void* spirv, size_t spirv_size);
 
 #ifdef __cplusplus
 }
