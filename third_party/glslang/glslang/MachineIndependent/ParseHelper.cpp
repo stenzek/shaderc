@@ -42,7 +42,6 @@
 #include "Initialize.h"
 #include "Scan.h"
 
-#include "../OSDependent/osinclude.h"
 #include <algorithm>
 
 #include "preprocessor/PpContext.h"
@@ -3934,6 +3933,18 @@ void TParseContext::accStructCheck(const TSourceLoc& loc, const TType& type, con
         error(loc, "accelerationStructureNV can only be used in uniform variables or function parameters:",
             type.getBasicTypeString().c_str(), identifier.c_str());
 
+}
+
+void TParseContext::hitObjectNVCheck(const TSourceLoc & loc, const TType & type, const TString & identifier)
+{
+    if (type.getBasicType() == EbtStruct && containsFieldWithBasicType(type, EbtHitObjectNV)) {
+        error(loc, "struct is not allowed to contain hitObjectNV:", type.getTypeName().c_str(), identifier.c_str());
+    } else if (type.getBasicType() == EbtHitObjectNV) {
+        TStorageQualifier qualifier = type.getQualifier().storage;
+        if (qualifier != EvqGlobal && qualifier != EvqTemporary) {
+            error(loc, "hitObjectNV can only be declared in global or function scope with no storage qualifier:", "hitObjectNV", identifier.c_str());
+        }
+    }
 }
 
 void TParseContext::transparentOpaqueCheck(const TSourceLoc& loc, const TType& type, const TString& identifier)
@@ -7875,6 +7886,7 @@ TIntermNode* TParseContext::declareVariable(const TSourceLoc& loc, TString& iden
     transparentOpaqueCheck(loc, type, identifier);
     atomicUintCheck(loc, type, identifier);
     accStructCheck(loc, type, identifier);
+    hitObjectNVCheck(loc, type, identifier);
     checkAndResizeMeshViewDim(loc, type, /*isBlockMember*/ false);
     if (type.getQualifier().storage == EvqConst && type.containsReference()) {
         error(loc, "variables with reference type can't have qualifier 'const'", "qualifier", "");
@@ -9912,8 +9924,8 @@ void TParseContext::updateStandaloneQualifierDefaults(const TSourceLoc& loc, con
 
     if (publicType.shaderQualifiers.layoutDerivativeGroupQuads) {
         if (publicType.qualifier.storage == EvqVaryingIn) {
-            if ((intermediate.getLocalSize(0) & 1) ||
-                (intermediate.getLocalSize(1) & 1))
+            if ((intermediate.getLocalSizeSpecId(0) == TQualifier::layoutNotSet && (intermediate.getLocalSize(0) & 1)) ||
+                (intermediate.getLocalSizeSpecId(1) == TQualifier::layoutNotSet && (intermediate.getLocalSize(1) & 1)))
                 error(loc, "requires local_size_x and local_size_y to be multiple of two", "derivative_group_quadsNV", "");
             else
                 intermediate.setLayoutDerivativeMode(LayoutDerivativeGroupQuads);
@@ -9923,7 +9935,10 @@ void TParseContext::updateStandaloneQualifierDefaults(const TSourceLoc& loc, con
     }
     if (publicType.shaderQualifiers.layoutDerivativeGroupLinear) {
         if (publicType.qualifier.storage == EvqVaryingIn) {
-            if((intermediate.getLocalSize(0) *
+            if (intermediate.getLocalSizeSpecId(0) == TQualifier::layoutNotSet &&
+                intermediate.getLocalSizeSpecId(1) == TQualifier::layoutNotSet &&
+                intermediate.getLocalSizeSpecId(2) == TQualifier::layoutNotSet &&
+                (intermediate.getLocalSize(0) *
                 intermediate.getLocalSize(1) *
                 intermediate.getLocalSize(2)) % 4 != 0)
                 error(loc, "requires total group size to be multiple of four", "derivative_group_linearNV", "");
