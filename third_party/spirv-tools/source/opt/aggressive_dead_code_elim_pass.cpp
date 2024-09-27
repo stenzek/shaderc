@@ -267,6 +267,7 @@ void AggressiveDCEPass::AddBreaksAndContinuesToWorklist(
 }
 
 bool AggressiveDCEPass::AggressiveDCE(Function* func) {
+  if (func->IsDeclaration()) return false;
   std::list<BasicBlock*> structured_order;
   cfg()->ComputeStructuredOrder(func, &*func->begin(), &structured_order);
   live_local_vars_.clear();
@@ -1011,7 +1012,8 @@ void AggressiveDCEPass::InitExtensions() {
       "SPV_EXT_fragment_shader_interlock",
       "SPV_NV_compute_shader_derivatives",
       "SPV_NV_cooperative_matrix",
-      "SPV_KHR_cooperative_matrix"
+      "SPV_KHR_cooperative_matrix",
+      "SPV_KHR_ray_tracing_position_fetch"
   });
   // clang-format on
 }
