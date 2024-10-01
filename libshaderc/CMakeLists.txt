@@ -30,6 +30,8 @@ target_include_directories(shaderc_shared
     PRIVATE include
             ${glslang_SOURCE_DIR}
             ${SPIRV-Headers_SOURCE_DIR}/include)
+target_include_directories(shaderc_shared
+    INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_definitions(shaderc_shared
     PRIVATE SHADERC_IMPLEMENTATION
     PUBLIC SHADERC_SHAREDLIB

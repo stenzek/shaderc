@@ -186,6 +186,7 @@ endif()
 # Ideally, all of these will go away - see https://github.com/KhronosGroup/SPIRV-Tools/issues/3909.
 option(ENABLE_EXCEPTIONS_ON_MSVC "Build SPIRV-TOOLS with c++ exceptions enabled in MSVC" ON)
 option(SPIRV_TOOLS_BUILD_STATIC "Build ${SPIRV_TOOLS}-static target. ${SPIRV_TOOLS} will alias to ${SPIRV_TOOLS}-static or ${SPIRV_TOOLS}-shared based on BUILD_SHARED_LIBS" ON)
+option(SPIRV_TOOLS_BUILD_SHARED "Build ${SPIRV_TOOLS}-shared target." ON)
 if(SPIRV_TOOLS_BUILD_STATIC)
   set(SPIRV_TOOLS_FULL_VISIBILITY ${SPIRV_TOOLS}-static)
   set(SPIRV_TOOLS_LIBRARY_TYPE "STATIC")
