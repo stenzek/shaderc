@@ -156,8 +156,9 @@ typedef enum {
     EShTargetVulkan_1_1 = (1 << 22) | (1 << 12),      // Vulkan 1.1
     EShTargetVulkan_1_2 = (1 << 22) | (2 << 12),      // Vulkan 1.2
     EShTargetVulkan_1_3 = (1 << 22) | (3 << 12),      // Vulkan 1.3
+    EShTargetVulkan_1_4 = (1 << 22) | (4 << 12),      // Vulkan 1.4
     EShTargetOpenGL_450 = 450,                        // OpenGL
-    LAST_ELEMENT_MARKER(EShTargetClientVersionCount = 5),
+    LAST_ELEMENT_MARKER(EShTargetClientVersionCount = 6),
 } EShTargetClientVersion;
 
 typedef EShTargetClientVersion EshTargetClientVersion;
@@ -172,6 +173,21 @@ typedef enum {
     EShTargetSpv_1_6 = (1 << 16) | (6 << 8),          // SPIR-V 1.6
     LAST_ELEMENT_MARKER(EShTargetLanguageVersionCount = 7),
 } EShTargetLanguageVersion;
+
+//
+// Following are a series of helper enums for managing layouts and qualifiers,
+// used for TPublicType, TType, others.
+//
+
+enum TLayoutPacking {
+    ElpNone,
+    ElpShared, // default, but different than saying nothing
+    ElpStd140,
+    ElpStd430,
+    ElpPacked,
+    ElpScalar,
+    ElpCount // If expanding, see bitfield width below
+};
 
 struct TInputLanguage {
     EShSource languageFamily; // redundant information with other input, this one overrides when not EShSourceNone
@@ -256,6 +272,7 @@ enum EShMessages : unsigned {
     EShMsgEnhanced             = (1 << 15), // enhanced message readability
     EShMsgAbsolutePath         = (1 << 16), // Output Absolute path for messages
     EShMsgDisplayErrorColumn   = (1 << 17), // Display error message column aswell as line
+    EShMsgLinkTimeOptimization = (1 << 18), // perform cross-stage optimizations during linking
     LAST_ELEMENT_MARKER(EShMsgCount),
 };
 
@@ -847,6 +864,7 @@ public:
     // grow the reflection stage by stage
     bool virtual addStage(EShLanguage, TIntermediate&, TInfoSink&, TIoMapResolver*);
     bool virtual doMap(TIoMapResolver*, TInfoSink&) { return true; }
+    bool virtual setAutoPushConstantBlock(const char*, unsigned int, TLayoutPacking) { return false; }
 };
 
 // Get the default GLSL IO mapper
