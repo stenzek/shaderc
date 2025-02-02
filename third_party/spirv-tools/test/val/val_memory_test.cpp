@@ -1,4 +1,6 @@
 // Copyright (c) 2018 Google Inc.
+// Modifications Copyright (C) 2024 Advanced Micro Devices, Inc. All rights
+// reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -3112,7 +3114,6 @@ OpExtension "SPV_EXT_descriptor_indexing"
 OpMemoryModel Logical GLSL450
 OpEntryPoint Fragment %func "func"
 OpExecutionMode %func OriginUpperLeft
-OpDecorate %array_t ArrayStride 4
 OpMemberDecorate %struct_t 0 Offset 0
 OpDecorate %struct_t Block
 %uint_t = OpTypeInt 32 0
@@ -3358,7 +3359,6 @@ OpMemoryModel Logical GLSL450
 OpEntryPoint Fragment %func "func"
 OpExecutionMode %func OriginUpperLeft
 OpDecorate %inner_array_t ArrayStride 4
-OpDecorate %array_t ArrayStride 4
 OpMemberDecorate %struct_t 0 Offset 0
 OpDecorate %struct_t Block
 %uint_t = OpTypeInt 32 0
@@ -3388,7 +3388,6 @@ OpMemoryModel Logical GLSL450
 OpEntryPoint Fragment %func "func"
 OpExecutionMode %func OriginUpperLeft
 OpDecorate %inner_array_t ArrayStride 4
-OpDecorate %array_t ArrayStride 4
 OpMemberDecorate %struct_t 0 Offset 0
 OpDecorate %struct_t Block
 %uint_t = OpTypeInt 32 0
@@ -3932,6 +3931,158 @@ OpMemoryModel Logical GLSL450
   EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_UNIVERSAL_1_3));
   EXPECT_THAT(getDiagnosticString(),
               HasSubstr("Initializer type must match the data type"));
+}
+
+TEST_F(ValidateMemory, StoreToImage) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+%void = OpTypeVoid
+%int = OpTypeInt 32 0
+%img = OpTypeImage %int 2D 2 0 0 2 R32i
+%ptr_img = OpTypePointer Function %img
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%var = OpVariable %ptr_img Function
+%value = OpLoad %img %var
+OpStore %var %value
+OpReturn
+OpFunctionEnd
+)";
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_1);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_1));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-StandaloneSpirv-OpTypeImage-06924"));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("Cannot store to OpTypeImage, OpTypeSampler, "
+                "OpTypeSampledImage, or OpTypeAccelerationStructureKHR"));
+}
+
+TEST_F(ValidateMemory, StoreToImageArray) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+%void = OpTypeVoid
+%int = OpTypeInt 32 0
+%img = OpTypeImage %int 2D 2 0 0 2 R32i
+%arr_size = OpConstant %int 5
+%i = OpConstant %int 2
+%arr_img = OpTypeArray %img %arr_size
+%ptr_img = OpTypePointer Function %img
+%ptr_arr_img = OpTypePointer Function %arr_img
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%var = OpVariable %ptr_arr_img Function
+%value = OpLoad %arr_img %var
+OpStore %var %value
+OpReturn
+OpFunctionEnd
+)";
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_1);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_1));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-StandaloneSpirv-OpTypeImage-06924"));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("Cannot store to OpTypeImage, OpTypeSampler, "
+                "OpTypeSampledImage, or OpTypeAccelerationStructureKHR"));
+}
+
+TEST_F(ValidateMemory, StoreToSampler) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+%void = OpTypeVoid
+%smp = OpTypeSampler
+%ptr_smp = OpTypePointer Function %smp
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%var = OpVariable %ptr_smp Function
+%value = OpLoad %smp %var
+OpStore %var %value
+OpReturn
+OpFunctionEnd
+)";
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_1);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_1));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-StandaloneSpirv-OpTypeImage-06924"));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("Cannot store to OpTypeImage, OpTypeSampler, "
+                "OpTypeSampledImage, or OpTypeAccelerationStructureKHR"));
+}
+
+TEST_F(ValidateMemory, StoreToSampledImage) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+%void = OpTypeVoid
+%int = OpTypeInt 32 0
+%img = OpTypeImage %int 2D 2 0 0 1 R32i
+%samp_img = OpTypeSampledImage %img
+%ptr_samp_img = OpTypePointer Function %samp_img
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%var = OpVariable %ptr_samp_img Function
+%value = OpLoad %samp_img %var
+OpStore %var %value
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_1);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_1));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-StandaloneSpirv-OpTypeImage-06924"));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("Cannot store to OpTypeImage, OpTypeSampler, "
+                "OpTypeSampledImage, or OpTypeAccelerationStructureKHR"));
+}
+
+TEST_F(ValidateMemory, StoreToAccelarationStructureKHR) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpCapability RayQueryKHR
+OpExtension "SPV_KHR_ray_query"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+%void = OpTypeVoid
+%as = OpTypeAccelerationStructureKHR
+%ptr_as = OpTypePointer Function %as
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%var = OpVariable %ptr_as Function
+%value = OpLoad %as %var
+OpStore %var %value
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_1);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_1));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-StandaloneSpirv-OpTypeImage-06924"));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("Cannot store to OpTypeImage, OpTypeSampler, "
+                "OpTypeSampledImage, or OpTypeAccelerationStructureKHR"));
 }
 
 TEST_F(ValidateMemory, StoreToUniformBlock) {
@@ -7019,6 +7170,1132 @@ OpFunctionEnd
   EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_3));
 }
 
+std::string GenCoopMat2Shader(const std::string& extra_types,
+                              const std::string& main_body,
+                              const std::string& after_main = "",
+                              const std::string& extra_decorations = "") {
+  const std::string prefix = R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability PhysicalStorageBufferAddresses
+OpCapability VulkanMemoryModel
+OpCapability CooperativeMatrixKHR
+OpCapability TensorAddressingNV
+OpCapability CooperativeMatrixTensorAddressingNV
+OpCapability CooperativeMatrixBlockLoadsNV
+OpExtension "SPV_KHR_physical_storage_buffer"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+OpExtension "SPV_NV_tensor_addressing"
+OpExtension "SPV_NV_cooperative_matrix2"
+OpExtension "SPV_KHR_cooperative_matrix"
+OpExtension "SPV_KHR_vulkan_memory_model"
+OpMemoryModel Logical VulkanKHR
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+
+OpDecorate %f16_arr ArrayStride 2
+OpDecorate %46 Block
+OpMemberDecorate %46 0 Offset 0
+OpDecorate %48 Binding 0
+OpDecorate %48 DescriptorSet 0
+OpDecorate %psb Restrict
+)" + extra_decorations + R"(
+%void = OpTypeVoid
+%bool = OpTypeBool
+%func = OpTypeFunction %void
+%f16 = OpTypeFloat 16
+%f32 = OpTypeFloat 32
+%u32 = OpTypeInt 32 0
+%s32 = OpTypeInt 32 1
+
+%s32_0 = OpConstant %s32 0
+%f16_0 = OpConstant %f16 0
+%u32_2 = OpConstant %u32 2
+%u32_8 = OpConstant %u32 8
+%use_A = OpConstant %u32 0
+%workgroup = OpConstant %u32 2
+%subgroup = OpConstant %u32 3
+
+%f16_arr = OpTypeRuntimeArray %f16
+%46 = OpTypeStruct %f16_arr
+%47 = OpTypePointer StorageBuffer %46
+%48 = OpVariable %47 StorageBuffer
+%51 = OpTypePointer StorageBuffer %f16_arr
+%psbptr = OpTypePointer PhysicalStorageBuffer %f16_arr
+
+%f16mat = OpTypeCooperativeMatrixKHR %f16 %workgroup %u32_8 %u32_8 %use_A
+%f32mat = OpTypeCooperativeMatrixKHR %f32 %subgroup %u32_8 %u32_8 %use_A
+
+%arr2 = OpTypeArray %u32 %u32_2
+%functy = OpTypeFunction %f16 %psbptr %arr2 %arr2
+)";
+
+  const std::string decode_func =
+      R"(
+%decodefunc = OpFunction %f16 None %functy
+%psb = OpFunctionParameter %psbptr
+%c0 =  OpFunctionParameter %arr2
+%c1 =  OpFunctionParameter %arr2
+%entry2 = OpLabel
+OpReturnValue %f16_0
+OpFunctionEnd
+)";
+
+  const std::string func_begin =
+      R"(
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%array_ptr = OpAccessChain %51 %48 %s32_0
+)";
+
+  const std::string suffix =
+      R"(
+OpReturn
+OpFunctionEnd)";
+
+  return prefix + extra_types + func_begin + main_body + suffix + decode_func +
+         after_main;
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutAndViewSuccess) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutInvalidDimFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 6
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("must be between 1 and 5"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutInvalidClampFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 6
+      %dim = OpConstant %u32 2
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("must be a valid TensorClampMode"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewInvalidDimFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 6
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("must be between 1 and 5"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewInvalidPermutationFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1 %p1
+      )",
+      R"(
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Permutation values don't form a valid permutation"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewInvalidPermutation2Fail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Incorrect number of permutation values."));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutBlockSizePass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetBlockSizeNV %layout %tl %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutBlockSizeFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetBlockSizeNV %layout %tl %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("unexpected number of operands"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutDimensionPass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetDimensionNV %layout %tl %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutDimensionFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetDimensionNV %layout %tl %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("unexpected number of operands"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutStridePass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetStrideNV %layout %tl %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutStrideFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetStrideNV %layout %tl %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("unexpected number of operands"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutSlicePass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSliceNV %layout %tl %b %b %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutSliceFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSliceNV %layout %tl %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("unexpected number of operands"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorLayoutSetClampValuePass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 3
+      %b = OpConstant %u32 1
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      )",
+      R"(
+      %tl = OpCreateTensorLayoutNV %layout
+      %tl2 = OpTensorLayoutSetClampValueNV %layout %tl %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewDimensionPass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %hasdim = OpConstantFalse %bool
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %p2 = OpConstant %u32 2
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1 %p2
+      %b = OpConstant %u32 1
+      )",
+      R"(
+      %tv = OpCreateTensorViewNV %view
+      %tv2 = OpTensorViewSetDimensionNV %view %tv %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewDimensionFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %hasdim = OpConstantFalse %bool
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %p2 = OpConstant %u32 2
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1 %p2
+      %b = OpConstant %u32 1
+      )",
+      R"(
+      %tv = OpCreateTensorViewNV %view
+      %tv2 = OpTensorViewSetDimensionNV %view %tv %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("unexpected number of operands"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewStridePass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %hasdim = OpConstantFalse %bool
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %p2 = OpConstant %u32 2
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1 %p2
+      %b = OpConstant %u32 1
+      )",
+      R"(
+      %tv = OpCreateTensorViewNV %view
+      %tv2 = OpTensorViewSetStrideNV %view %tv %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewStrideFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %hasdim = OpConstantFalse %bool
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %p2 = OpConstant %u32 2
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1 %p2
+      %b = OpConstant %u32 1
+      )",
+      R"(
+      %tv = OpCreateTensorViewNV %view
+      %tv2 = OpTensorViewSetStrideNV %view %tv %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("unexpected number of operands"));
+}
+
+TEST_F(ValidateMemory, CoopMat2TensorViewClipPass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %dim = OpConstant %u32 3
+      %hasdim = OpConstantFalse %bool
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %p2 = OpConstant %u32 2
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1 %p2
+      %b = OpConstant %u32 1
+      )",
+      R"(
+      %tv = OpCreateTensorViewNV %view
+      %tv2 = OpTensorViewSetClipNV %view %tv %b %b %b %b
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2LoadStoreTensorPass) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      %mat = OpUndef %f16mat
+      %tl = OpCreateTensorLayoutNV %layout
+      %tv = OpCreateTensorViewNV %view
+      %mat2 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None None
+      %mat3 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl Aligned 4 None
+      %mat4 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None TensorView %tv
+      %mat5 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None DecodeFunc %decodefunc
+      %mat6 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None TensorView|DecodeFunc %tv %decodefunc
+      %mat7 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl Aligned 4 TensorView|DecodeFunc %tv %decodefunc
+      OpCooperativeMatrixStoreTensorNV %array_ptr %mat %tl None None
+      OpCooperativeMatrixStoreTensorNV %array_ptr %mat %tl Aligned 4 None
+      OpCooperativeMatrixStoreTensorNV %array_ptr %mat %tl None TensorView %tv
+      OpCooperativeMatrixStoreTensorNV %array_ptr %mat %tl Aligned 4 TensorView %tv
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateMemory, CoopMat2LoadTensorWrongLayoutTypeFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      %mat = OpUndef %f16mat
+      %tl = OpCreateTensorLayoutNV %layout
+      %tv = OpCreateTensorViewNV %view
+      %mat2 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tv None None
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("does not have a tensor layout type"));
+}
+
+TEST_F(ValidateMemory, CoopMat2LoadTensorWrongObjectTypeFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      %mat = OpUndef %f32mat
+      %tl = OpCreateTensorLayoutNV %layout
+      %tv = OpCreateTensorViewNV %view
+      %mat2 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None None
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("type does not match Result Type"));
+}
+
+TEST_F(ValidateMemory, CoopMat2LoadTensorDecodeFuncTypeFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      )",
+      R"(
+      %mat = OpUndef %f32mat
+      %tl = OpCreateTensorLayoutNV %layout
+      %tv = OpCreateTensorViewNV %view
+      %mat2 = OpCooperativeMatrixLoadTensorNV %f32mat %array_ptr %mat %tl None DecodeFunc %decodefunc
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("return type must match matrix component type"));
+}
+
+TEST_F(ValidateMemory, CoopMat2LoadTensorDecodeFuncArrayTypeFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %u32_3 = OpConstant %u32 3
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      %arr3 = OpTypeArray %u32 %u32_3
+      %functy2 = OpTypeFunction %f16 %psbptr %arr3 %arr3
+      )",
+      R"(
+      %mat = OpUndef %f16mat
+      %tl = OpCreateTensorLayoutNV %layout
+      %tv = OpCreateTensorViewNV %view
+      %mat2 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None DecodeFunc %decodefunc2
+      )",
+      R"(
+      %decodefunc2 = OpFunction %f16 None %functy2
+      %psb2 = OpFunctionParameter %psbptr
+      %c02 =  OpFunctionParameter %arr3
+      %c12 =  OpFunctionParameter %arr3
+      %entry3 = OpLabel
+      OpReturnValue %f16_0
+      OpFunctionEnd
+      )",
+      R"(
+      OpDecorate %psb2 Restrict
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("dimension equal to the tensor dimension"));
+}
+
+TEST_F(ValidateMemory, CoopMat2LoadTensorDecodeFuncPointerTypeFail) {
+  std::string spirv = GenCoopMat2Shader(
+      R"(
+      %clamp = OpConstant %u32 0
+      %dim = OpConstant %u32 2
+      %p0 = OpConstant %u32 0
+      %p1 = OpConstant %u32 1
+      %hasdim = OpConstantFalse %bool
+      %layout = OpTypeTensorLayoutNV %dim %clamp
+      %view = OpTypeTensorViewNV %dim %hasdim %p0 %p1
+      %sbptr = OpTypePointer StorageBuffer %f16_arr
+      %functy2 = OpTypeFunction %f16 %sbptr %arr2 %arr2
+      )",
+      R"(
+      %mat = OpUndef %f16mat
+      %tl = OpCreateTensorLayoutNV %layout
+      %tv = OpCreateTensorViewNV %view
+      %mat2 = OpCooperativeMatrixLoadTensorNV %f16mat %array_ptr %mat %tl None DecodeFunc %decodefunc2
+      )",
+      R"(
+      %decodefunc2 = OpFunction %f16 None %functy2
+      %sb = OpFunctionParameter %sbptr
+      %c02 =  OpFunctionParameter %arr2
+      %c12 =  OpFunctionParameter %arr2
+      %entry3 = OpLabel
+      OpReturnValue %f16_0
+      OpFunctionEnd
+      )");
+
+  CompileSuccessfully(spirv.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("first parameter must be pointer to PhysicalStorageBuffer"));
+}
+
+TEST_F(ValidateMemory, PtrAccessChainNodePayloadArray) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpCapability ShaderEnqueueAMDX
+OpExtension "SPV_AMDX_shader_enqueue"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main" %input
+%uint = OpTypeInt 32 0
+%uint_0 = OpConstant %uint 0
+%uint_1 = OpConstant %uint 1
+%node0 = OpConstantStringAMDX "node0"
+%node1 = OpConstantStringAMDX "node1"
+%node2 = OpConstantStringAMDX "node2"
+%S = OpTypeStruct %uint
+%_payloadarr_S = OpTypeNodePayloadArrayAMDX %S
+%_ptr_NodePayloadAMDX__payloadarr_S = OpTypePointer NodePayloadAMDX %_payloadarr_S
+%_ptr_NodePayloadAMDX_uint = OpTypePointer NodePayloadAMDX %uint
+%void = OpTypeVoid
+%void_fn = OpTypeFunction %void
+%input = OpVariable %_ptr_NodePayloadAMDX__payloadarr_S NodePayloadAMDX
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%x = OpAccessChain %_ptr_NodePayloadAMDX_uint %input %uint_0 %uint_0
+OpReturn
+OpFunctionEnd
+)";
+
+  spv_target_env env = SPV_ENV_UNIVERSAL_1_4;
+  CompileSuccessfully(spirv, env);
+  EXPECT_THAT(SPV_SUCCESS, ValidateInstructions(env));
+}
+
+std::string GenCoopVecLoadStoreShader(const std::string& storeMemoryAccess,
+                                      const std::string& loadMemoryAccess) {
+  std::string s = R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability StorageBuffer16BitAccess
+OpCapability VulkanMemoryModel
+OpCapability CooperativeVectorNV
+OpCapability ReplicatedCompositesEXT
+OpExtension "SPV_EXT_replicated_composites"
+OpExtension "SPV_KHR_vulkan_memory_model"
+OpExtension "SPV_NV_cooperative_vector"
+%1 = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical Vulkan
+OpEntryPoint GLCompute %4 "main" %48 %73
+OpExecutionMode %4 LocalSize 1 1 1
+
+OpDecorate %45 ArrayStride 2
+OpDecorate %46 Block
+OpMemberDecorate %46 0 Offset 0
+OpDecorate %48 Binding 0
+OpDecorate %48 DescriptorSet 0
+
+%2 = OpTypeVoid
+%3 = OpTypeFunction %2
+%6 = OpTypeInt 32 0
+%49 = OpTypeInt 32 1
+%41 = OpTypeFloat 16
+
+%14 = OpConstant %6 1
+%50 = OpConstant %49 0
+%82 = OpConstant %6 5
+
+%42 = OpTypeCooperativeVectorNV %41 %14
+%43 = OpTypePointer Function %42
+
+%45 = OpTypeRuntimeArray %41
+%46 = OpTypeStruct %45
+%47 = OpTypePointer StorageBuffer %46
+%48 = OpVariable %47 StorageBuffer
+%51 = OpTypePointer StorageBuffer %45
+
+%57 = OpTypePointer Private %42
+%73 = OpVariable %57 Private
+
+%4 = OpFunction %2 None %3
+%5 = OpLabel
+%52 = OpAccessChain %51 %48 %50
+%56 = OpCooperativeVectorLoadNV %42 %52 %50 )" +
+                  loadMemoryAccess + R"( %82
+%77 = OpLoad %42 %73
+OpCooperativeVectorStoreNV %52 %50 %77 )" + storeMemoryAccess + R"( %82
+OpReturn
+OpFunctionEnd
+)";
+
+  return s;
+}
+
+TEST_F(ValidateMemory, CoopVecLoadStoreSuccess) {
+  std::string spirv =
+      GenCoopVecLoadStoreShader("MakePointerAvailableKHR|NonPrivatePointerKHR",
+                                "MakePointerVisibleKHR|NonPrivatePointerKHR");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+}
+
+TEST_F(ValidateMemory, CoopVecStoreMemoryAccessFail) {
+  std::string spirv =
+      GenCoopVecLoadStoreShader("MakePointerVisibleKHR|NonPrivatePointerKHR",
+                                "MakePointerVisibleKHR|NonPrivatePointerKHR");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("MakePointerVisibleKHR cannot be used with OpStore"));
+}
+
+TEST_F(ValidateMemory, CoopVecLoadMemoryAccessFail) {
+  std::string spirv =
+      GenCoopVecLoadStoreShader("MakePointerAvailableKHR|NonPrivatePointerKHR",
+                                "MakePointerAvailableKHR|NonPrivatePointerKHR");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("MakePointerAvailableKHR cannot be used with OpLoad"));
+}
+
+TEST_F(ValidateMemory, CoopVecInvalidStorageClassFail) {
+  const std::string body = R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability CooperativeVectorNV
+OpCapability ReplicatedCompositesEXT
+OpExtension "SPV_NV_cooperative_vector"
+OpExtension "SPV_EXT_replicated_composites"
+OpExtension "SPV_KHR_vulkan_memory_model"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%f16 = OpTypeFloat 16
+%u32 = OpTypeInt 32 0
+
+%u32_8 = OpConstant %u32 8
+%use_A = OpConstant %u32 0
+%subgroup = OpConstant %u32 3
+
+%f16vec = OpTypeCooperativeVectorNV %f16 %u32_8
+
+%str = OpTypeStruct %f16vec
+%str_ptr = OpTypePointer Workgroup %str
+%sh = OpVariable %str_ptr Workgroup
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+OpReturn
+OpFunctionEnd)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Cooperative vector types (or types containing them) can only be "
+          "allocated in Function or Private storage classes or as function "
+          "parameters"));
+}
+
+std::string GenCoopVecShader(const std::string& extra_types,
+                             const std::string& main_body) {
+  const std::string prefix =
+      R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability Int64
+OpCapability StorageBuffer16BitAccess
+OpCapability VulkanMemoryModel
+OpCapability CooperativeVectorNV
+OpCapability CooperativeVectorTrainingNV
+OpCapability ReplicatedCompositesEXT
+OpExtension "SPV_EXT_replicated_composites"
+OpExtension "SPV_KHR_vulkan_memory_model"
+OpExtension "SPV_NV_cooperative_vector"
+%1 = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical Vulkan
+OpEntryPoint GLCompute %main "main" %48 %73
+OpExecutionMode %main LocalSize 1 1 1
+
+OpDecorate %f16_arr ArrayStride 2
+OpDecorate %46 Block
+OpMemberDecorate %46 0 Offset 0
+OpDecorate %48 Binding 0
+OpDecorate %48 DescriptorSet 0
+
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%u32 = OpTypeInt 32 0
+%s32 = OpTypeInt 32 1
+%f16 = OpTypeFloat 16
+%bool = OpTypeBool
+
+%false = OpConstantFalse %bool
+%u32_4 = OpConstant %u32 4
+%u32_8 = OpConstant %u32 8
+%s32_0 = OpConstant %s32 0
+%f16_0 = OpConstant %f16 0
+
+%f16vec4 = OpTypeCooperativeVectorNV %f16 %u32_4
+%f16vec8 = OpTypeCooperativeVectorNV %f16 %u32_8
+
+%f16_arr = OpTypeRuntimeArray %f16
+%46 = OpTypeStruct %f16_arr
+%47 = OpTypePointer StorageBuffer %46
+%48 = OpVariable %47 StorageBuffer
+%51 = OpTypePointer StorageBuffer %f16_arr
+
+%57 = OpTypePointer Private %f16vec4
+%73 = OpVariable %57 Private
+%u32ptr = OpTypePointer Function %u32
+
+%input4 = OpConstantCompositeReplicateEXT %f16vec4 %f16_0
+%input8 = OpConstantCompositeReplicateEXT %f16vec8 %f16_0
+%interp = OpConstant %u32 0
+%offset = OpConstant %u32 0
+
+)";
+
+  const std::string func_begin =
+      R"(
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+%u32var = OpVariable %u32ptr Function
+%array_ptr = OpAccessChain %51 %48 %s32_0
+)";
+
+  const std::string suffix =
+      R"(
+OpReturn
+OpFunctionEnd)";
+
+  return prefix + extra_types + func_begin + main_body + suffix;
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulSuccess) {
+  std::string spirv = GenCoopVecShader("",
+                                       R"(
+%result0 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input4 %interp %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+%result1 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input8 %interp %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_8 %s32_0 %false
+%result2 = OpCooperativeVectorMatrixMulAddNV %f16vec8 %input4 %interp %array_ptr %offset %interp %array_ptr %offset %interp %u32_8 %u32_4 %s32_0 %false
+%result3 = OpCooperativeVectorMatrixMulNV %f16vec4 %input4 %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+%result4 = OpCooperativeVectorMatrixMulNV %f16vec4 %input8 %interp %array_ptr %offset %interp %u32_4 %u32_8 %s32_0 %false
+%result5 = OpCooperativeVectorMatrixMulNV %f16vec8 %input4 %interp %array_ptr %offset %interp %u32_8 %u32_4 %s32_0 %false
+
+OpCooperativeVectorReduceSumAccumulateNV %array_ptr %offset %input4
+OpCooperativeVectorOuterProductAccumulateNV %array_ptr %offset %input4 %input8 %interp %interp
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulKMismatchFail) {
+  std::string spirv = GenCoopVecShader(R"()",
+                                       R"(
+%result1 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input8 %interp %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorMatrixMulAddNV input number of "
+                        "components 8 does not match K 4"));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulPackedKMismatchPass) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%packed = OpConstant %u32 1000491001
+      )",
+      R"(
+%result1 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input8 %packed %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulMMismatchFail) {
+  std::string spirv = GenCoopVecShader(R"()",
+                                       R"(
+%result1 = OpCooperativeVectorMatrixMulAddNV %f16vec8 %input8 %interp %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_8 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorMatrixMulAddNV result type number "
+                        "of components 8 does not match M 4"));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulTransposeTypeFail) {
+  std::string spirv = GenCoopVecShader(R"()",
+                                       R"(
+%result0 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input4 %interp %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %s32_0
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorMatrixMulAddNV Transpose <id> "
+                        "'16[%int_0]' is not a scalar boolean"));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulInputInterpretationNotConstantFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+      )",
+      R"(
+%u32val = OpLoad %u32 %u32var
+%result0 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input4 %u32val %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorMatrixMulAddNV InputInterpretation "
+                        "<id> '31[%31]' is not a constant instruction"));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulMatrixInterpretationNotConstantFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+      )",
+      R"(
+%u32val = OpLoad %u32 %u32var
+%result0 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input4 %interp %array_ptr %offset %u32val %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("OpCooperativeVectorMatrixMulAddNV MatrixInterpretation <id> "
+                "'31[%31]' is not a constant instruction"));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulBiasInterpretationNotConstantFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+      )",
+      R"(
+%u32val = OpLoad %u32 %u32var
+%result0 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input4 %interp %array_ptr %offset %interp %array_ptr %offset %u32val %u32_4 %u32_4 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorMatrixMulAddNV BiasInterpretation "
+                        "<id> '31[%31]' is not a constant instruction"));
+}
+
+TEST_F(ValidateMemory, CoopVecMatMulInputInterpretationNotInt32Fail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+      )",
+      R"(
+%result0 = OpCooperativeVectorMatrixMulAddNV %f16vec4 %input4 %false %array_ptr %offset %interp %array_ptr %offset %interp %u32_4 %u32_4 %s32_0 %false
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorMatrixMulAddNV InputInterpretation "
+                        "type <id> '12[%bool]' is not a 32 bit integer"));
+}
+
+TEST_F(ValidateMemory, CoopVecOuterProductABMismatchFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%f32 = OpTypeFloat 32
+%f32vec8 = OpTypeCooperativeVectorNV %f32 %u32_8
+%f32_0 = OpConstant %f32 0
+%input8f32 = OpConstantCompositeReplicateEXT %f32vec8 %f32_0
+      )",
+      R"(
+OpCooperativeVectorOuterProductAccumulateNV %array_ptr %offset %input4 %input8f32 %interp %interp
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("OpCooperativeVectorOuterProductAccumulateNV A and B component "
+                "types '11[%half]' and '28[%float]' do not match"));
+}
+
+TEST_F(ValidateMemory, CoopVecOuterProductInt32OffsetFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%u64 = OpTypeInt 64 0
+%u64_0 = OpConstant %u64 0
+      )",
+      R"(
+OpCooperativeVectorOuterProductAccumulateNV %array_ptr %u64_0 %input4 %input8 %interp %interp
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorOuterProductAccumulateNV Offset "
+                        "type <id> '28[%ulong]' is not a 32 bit integer"));
+}
+
+TEST_F(ValidateMemory, CoopVecOuterProductInt32MatrixStrideFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%u64 = OpTypeInt 64 0
+%u64_0 = OpConstant %u64 0
+      )",
+      R"(
+OpCooperativeVectorOuterProductAccumulateNV %array_ptr %offset %input4 %input8 %interp %interp %u64_0
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("OpCooperativeVectorOuterProductAccumulateNV MatrixStride type "
+                "<id> '28[%ulong]' is not a 32 bit integer"));
+}
+
+TEST_F(ValidateMemory, CoopVecOuterProductVectorTypeFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%f16v4 = OpTypeVector %f16 4
+%f16c = OpConstantCompositeReplicateEXT %f16v4 %f16_0
+      )",
+      R"(
+OpCooperativeVectorOuterProductAccumulateNV %array_ptr %offset %f16c %input8 %interp %interp
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorOuterProductAccumulateNV A type "
+                        "<id> '28[%v4half]' is not a cooperative vector type"));
+}
+
+TEST_F(ValidateMemory, CoopVecReduceSumInt32OffsetFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%u64 = OpTypeInt 64 0
+%u64_0 = OpConstant %u64 0
+      )",
+      R"(
+OpCooperativeVectorReduceSumAccumulateNV %array_ptr %u64_0 %input4
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorReduceSumAccumulateNV Offset type "
+                        "<id> '28[%ulong]' is not a 32 bit integer"));
+}
+
+TEST_F(ValidateMemory, CoopVecReduceSumVectorTypeFail) {
+  std::string spirv = GenCoopVecShader(
+      R"(
+%f16v4 = OpTypeVector %f16 4
+%f16c = OpConstantCompositeReplicateEXT %f16v4 %f16_0
+      )",
+      R"(
+OpCooperativeVectorReduceSumAccumulateNV %array_ptr %offset %f16c
+      )");
+
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_1_SPIRV_1_4);
+  ASSERT_EQ(SPV_ERROR_INVALID_ID,
+            ValidateInstructions(SPV_ENV_VULKAN_1_1_SPIRV_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpCooperativeVectorReduceSumAccumulateNV V type <id> "
+                        "'28[%v4half]' is not a cooperative vector type."));
+}
 }  // namespace
 }  // namespace val
 }  // namespace spvtools
