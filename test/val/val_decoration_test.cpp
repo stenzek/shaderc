@@ -1,4 +1,6 @@
 // Copyright (c) 2017 Google Inc.
+// Modifications Copyright (C) 2024 Advanced Micro Devices, Inc. All rights
+// reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -2069,6 +2071,68 @@ TEST_F(ValidateDecorations, BlockCantAppearWithinABufferblockBad) {
 
   CompileSuccessfully(spirv);
   EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateAndRetrieveValidationState());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("rules: A Block or BufferBlock cannot be nested within "
+                        "another Block or BufferBlock."));
+}
+
+TEST_F(ValidateDecorations, BlockCannotAppearWithinBlockArray) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %main "main"
+OpMemberDecorate %outer 0 Offset 0
+OpMemberDecorate %outer 1 Offset 4
+OpMemberDecorate %outer 2 Offset 20
+OpDecorate %outer Block
+OpMemberDecorate %inner 0 Offset 0
+OpDecorate %inner Block
+%void = OpTypeVoid
+%void_fn = OpTypeFunction %void
+%int = OpTypeInt 32 0
+%int_4 = OpConstant %int 4
+%inner = OpTypeStruct %int
+%array = OpTypeArray %inner %int_4
+%outer = OpTypeStruct %int %array %int
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("rules: A Block or BufferBlock cannot be nested within "
+                        "another Block or BufferBlock."));
+}
+
+TEST_F(ValidateDecorations, BlockCannotAppearWithinBlockMultiArray) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %main "main"
+OpMemberDecorate %outer 0 Offset 0
+OpMemberDecorate %outer 1 Offset 4
+OpDecorate %outer Block
+OpMemberDecorate %inner 0 Offset 0
+OpDecorate %inner Block
+%void = OpTypeVoid
+%void_fn = OpTypeFunction %void
+%int = OpTypeInt 32 0
+%int_4 = OpConstant %int 4
+%inner = OpTypeStruct %int
+%array1 = OpTypeArray %inner %int_4
+%array2 = OpTypeArray %array1 %int_4
+%outer = OpTypeStruct %int %array2
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
   EXPECT_THAT(getDiagnosticString(),
               HasSubstr("rules: A Block or BufferBlock cannot be nested within "
                         "another Block or BufferBlock."));
@@ -10362,6 +10426,335 @@ OpFunctionEnd
   EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_2));
   EXPECT_THAT(getDiagnosticString(),
               HasSubstr("member 0 is missing an Offset decoration"));
+}
+
+TEST_F(ValidateDecorations, ComponentMultipleArrays) {
+  const std::string spirv = R"(
+               OpCapability Tessellation
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationEvaluation %main "main" %_ %FOO %FOO0
+               OpExecutionMode %main Triangles
+               OpExecutionMode %main SpacingEqual
+               OpExecutionMode %main VertexOrderCcw
+               OpSource GLSL 460
+               OpSourceExtension "GL_EXT_nonuniform_qualifier"
+               OpName %main "main"
+               OpName %gl_PerVertex "gl_PerVertex"
+               OpMemberName %gl_PerVertex 0 "gl_Position"
+               OpMemberName %gl_PerVertex 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex 2 "gl_ClipDistance"
+               OpMemberName %gl_PerVertex 3 "gl_CullDistance"
+               OpName %_ ""
+               OpName %FOO "FOO"
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+               OpDecorate %gl_PerVertex Block
+               OpDecorate %FOO Component 2
+               OpDecorate %FOO Location 1
+               OpDecorate %FOO0 Location 1
+               OpDecorate %FOO0 Component 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %v2float = OpTypeVector %float 2
+     %uint_2 = OpConstant %uint 2
+%_arr_v2float_uint_2 = OpTypeArray %v2float %uint_2
+    %uint_32 = OpConstant %uint 32
+%_arr__arr_v2float_uint_2_uint_32 = OpTypeArray %_arr_v2float_uint_2 %uint_32
+%_ptr_Input__arr__arr_v2float_uint_2_uint_32 = OpTypePointer Input %_arr__arr_v2float_uint_2_uint_32
+        %FOO = OpVariable %_ptr_Input__arr__arr_v2float_uint_2_uint_32 Input
+        %FOO0 = OpVariable %_ptr_Input__arr__arr_v2float_uint_2_uint_32 Input
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+      %int_1 = OpConstant %int 1
+     %uint_0 = OpConstant %uint 0
+%_ptr_Output_float = OpTypePointer Output %float
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %24 = OpAccessChain %_ptr_Input_v2float %FOO %int_0 %int_0
+         %25 = OpLoad %v2float %24
+         %27 = OpAccessChain %_ptr_Input_v2float %FOO0 %int_1 %int_1
+         %28 = OpLoad %v2float %27
+         %29 = OpFAdd %v2float %25 %28
+         %32 = OpAccessChain %_ptr_Output_float %_ %int_0 %uint_0
+         %33 = OpCompositeExtract %float %29 0
+               OpStore %32 %33
+         %34 = OpAccessChain %_ptr_Output_float %_ %int_0 %uint_1
+         %35 = OpCompositeExtract %float %29 1
+               OpStore %34 %35
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_0);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_0));
+}
+
+const std::string kNodeShaderPrelude = R"(
+OpCapability Shader
+OpCapability ShaderEnqueueAMDX
+OpExtension "SPV_AMDX_shader_enqueue"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpEntryPoint GLCompute %other "other"
+)";
+
+const std::string kNodeShaderPostlude = R"(
+%uint = OpTypeInt 32 0
+%uint_0 = OpConstant %uint 0
+%uint_1 = OpConstant %uint 1
+%node0 = OpConstantStringAMDX "node0"
+%node1 = OpConstantStringAMDX "node1"
+%node2 = OpConstantStringAMDX "node2"
+%S = OpTypeStruct
+%_payloadarr_S = OpTypeNodePayloadArrayAMDX %S
+%_payloadarr_S_0 = OpTypeNodePayloadArrayAMDX %S
+%bool = OpTypeBool
+%true = OpConstantTrue %bool
+%void = OpTypeVoid
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+OpReturn
+OpFunctionEnd
+%other = OpFunction %void None %void_fn
+%entry0 = OpLabel
+OpReturn
+OpFunctionEnd
+)";
+
+TEST_F(ValidateDecorations, NodeShader) {
+  const std::string spirv = kNodeShaderPrelude + R"(
+OpExecutionModeId %main ShaderIndexAMDX %uint_0
+OpExecutionModeId %main IsApiEntryAMDX %true
+OpExecutionModeId %main MaxNodeRecursionAMDX %uint_1
+OpExecutionModeId %main MaxNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpExecutionModeId %main SharesInputWithAMDX %node0 %uint_0
+OpExecutionModeId %other ShaderIndexAMDX %uint_0
+OpExecutionModeId %other StaticNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpDecorateId %_payloadarr_S PayloadNodeNameAMDX %node1
+OpDecorateId %_payloadarr_S_0 PayloadNodeNameAMDX %node2
+OpDecorateId %_payloadarr_S PayloadNodeBaseIndexAMDX %uint_0
+OpDecorateId %_payloadarr_S PayloadNodeArraySizeAMDX %uint_1
+OpDecorateId %_payloadarr_S NodeSharesPayloadLimitsWithAMDX %_payloadarr_S_0
+)" + kNodeShaderPostlude;
+
+  spv_target_env env = SPV_ENV_UNIVERSAL_1_3;
+  CompileSuccessfully(spirv, env);
+  EXPECT_THAT(SPV_SUCCESS, ValidateInstructions(env));
+}
+
+TEST_F(ValidateDecorations, NodeShaderDecoratePayloadNodeName) {
+  const std::string spirv = kNodeShaderPrelude + R"(
+OpExecutionModeId %main ShaderIndexAMDX %uint_0
+OpExecutionModeId %main IsApiEntryAMDX %true
+OpExecutionModeId %main MaxNodeRecursionAMDX %uint_1
+OpExecutionModeId %main MaxNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpExecutionModeId %main SharesInputWithAMDX %node0 %uint_0
+OpExecutionModeId %other ShaderIndexAMDX %uint_0
+OpExecutionModeId %other StaticNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpDecorate %_payloadarr_S PayloadNodeNameAMDX %node1
+OpDecorate %_payloadarr_S_0 PayloadNodeNameAMDX %node2
+OpDecorateId %_payloadarr_S PayloadNodeBaseIndexAMDX %uint_0
+OpDecorateId %_payloadarr_S PayloadNodeArraySizeAMDX %uint_1
+OpDecorateId %_payloadarr_S NodeSharesPayloadLimitsWithAMDX %_payloadarr_S_0
+)" + kNodeShaderPostlude;
+
+  spv_target_env env = SPV_ENV_UNIVERSAL_1_3;
+  CompileSuccessfully(spirv, env);
+  EXPECT_THAT(SPV_ERROR_INVALID_ID, ValidateInstructions(env));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Decorations taking ID parameters may not be used with OpDecorate"));
+}
+
+TEST_F(ValidateDecorations, NodeShaderDecoratePayloadNodeBaseIndex) {
+  const std::string spirv = kNodeShaderPrelude + R"(
+OpExecutionModeId %main ShaderIndexAMDX %uint_0
+OpExecutionModeId %main IsApiEntryAMDX %true
+OpExecutionModeId %main MaxNodeRecursionAMDX %uint_1
+OpExecutionModeId %main MaxNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpExecutionModeId %main SharesInputWithAMDX %node0 %uint_0
+OpExecutionModeId %other ShaderIndexAMDX %uint_0
+OpExecutionModeId %other StaticNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpDecorateId %_payloadarr_S PayloadNodeNameAMDX %node1
+OpDecorateId %_payloadarr_S_0 PayloadNodeNameAMDX %node2
+OpDecorate %_payloadarr_S PayloadNodeBaseIndexAMDX %uint_0
+OpDecorateId %_payloadarr_S PayloadNodeArraySizeAMDX %uint_1
+OpDecorateId %_payloadarr_S NodeSharesPayloadLimitsWithAMDX %_payloadarr_S_0
+)" + kNodeShaderPostlude;
+
+  spv_target_env env = SPV_ENV_UNIVERSAL_1_3;
+  CompileSuccessfully(spirv, env);
+  EXPECT_THAT(SPV_ERROR_INVALID_ID, ValidateInstructions(env));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Decorations taking ID parameters may not be used with OpDecorate"));
+}
+
+TEST_F(ValidateDecorations, NodeShaderDecoratePayloadNodeArraySize) {
+  const std::string spirv = kNodeShaderPrelude + R"(
+OpExecutionModeId %main ShaderIndexAMDX %uint_0
+OpExecutionModeId %main IsApiEntryAMDX %true
+OpExecutionModeId %main MaxNodeRecursionAMDX %uint_1
+OpExecutionModeId %main MaxNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpExecutionModeId %main SharesInputWithAMDX %node0 %uint_0
+OpExecutionModeId %other ShaderIndexAMDX %uint_0
+OpExecutionModeId %other StaticNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpDecorateId %_payloadarr_S PayloadNodeNameAMDX %node1
+OpDecorateId %_payloadarr_S_0 PayloadNodeNameAMDX %node2
+OpDecorateId %_payloadarr_S PayloadNodeBaseIndexAMDX %uint_0
+OpDecorate %_payloadarr_S PayloadNodeArraySizeAMDX %uint_1
+OpDecorateId %_payloadarr_S NodeSharesPayloadLimitsWithAMDX %_payloadarr_S_0
+)" + kNodeShaderPostlude;
+
+  spv_target_env env = SPV_ENV_UNIVERSAL_1_3;
+  CompileSuccessfully(spirv, env);
+  EXPECT_THAT(SPV_ERROR_INVALID_ID, ValidateInstructions(env));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Decorations taking ID parameters may not be used with OpDecorate"));
+}
+
+TEST_F(ValidateDecorations, NodeShaderDecorateNodeSharesPayloadLimitsWith) {
+  const std::string spirv = kNodeShaderPrelude + R"(
+OpExecutionModeId %main ShaderIndexAMDX %uint_0
+OpExecutionModeId %main IsApiEntryAMDX %true
+OpExecutionModeId %main MaxNodeRecursionAMDX %uint_1
+OpExecutionModeId %main MaxNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpExecutionModeId %main SharesInputWithAMDX %node0 %uint_0
+OpExecutionModeId %other ShaderIndexAMDX %uint_0
+OpExecutionModeId %other StaticNumWorkgroupsAMDX %uint_1 %uint_1 %uint_1
+OpDecorateId %_payloadarr_S PayloadNodeNameAMDX %node1
+OpDecorateId %_payloadarr_S_0 PayloadNodeNameAMDX %node2
+OpDecorateId %_payloadarr_S PayloadNodeBaseIndexAMDX %uint_0
+OpDecorateId %_payloadarr_S PayloadNodeArraySizeAMDX %uint_1
+OpDecorate %_payloadarr_S NodeSharesPayloadLimitsWithAMDX %_payloadarr_S_0
+)" + kNodeShaderPostlude;
+
+  spv_target_env env = SPV_ENV_UNIVERSAL_1_3;
+  CompileSuccessfully(spirv, env);
+  EXPECT_THAT(SPV_ERROR_INVALID_ID, ValidateInstructions(env));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Decorations taking ID parameters may not be used with OpDecorate"));
+}
+
+TEST_F(ValidateDecorations, BlockArrayWithStride) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpCapability Linkage
+OpMemoryModel Logical GLSL450
+OpDecorate %struct Block
+OpMemberDecorate %struct 0 Offset 0
+OpDecorate %array ArrayStride 4
+%int = OpTypeInt 32 0
+%int_4 = OpConstant %int 4
+%struct = OpTypeStruct %int
+%array = OpTypeArray %struct %int_4
+)";
+
+  CompileSuccessfully(spirv);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Array containing a Block or BufferBlock must not be "
+                        "decorated with ArrayStride"));
+}
+
+TEST_F(ValidateDecorations, BufferBlockRuntimeArrayWithStride) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpCapability Linkage
+OpMemoryModel Logical GLSL450
+OpDecorate %struct BufferBlock
+OpMemberDecorate %struct 0 Offset 0
+OpDecorate %array ArrayStride 4
+%int = OpTypeInt 32 0
+%struct = OpTypeStruct %int
+%array = OpTypeRuntimeArray %struct
+)";
+
+  CompileSuccessfully(spirv);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Array containing a Block or BufferBlock must not be "
+                        "decorated with ArrayStride"));
+}
+
+TEST_F(ValidateDecorations, BlockArrayWithoutStride) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+OpDecorate %struct Block
+OpMemberDecorate %struct 0 Offset 0
+OpDecorate %var DescriptorSet 0
+OpDecorate %var Binding 0
+%int = OpTypeInt 32 0
+%int_4 = OpConstant %int 4
+%struct = OpTypeStruct %int
+%array = OpTypeArray %struct %int_4
+%ptr = OpTypePointer StorageBuffer %array
+%var = OpVariable %ptr StorageBuffer
+%void = OpTypeVoid
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_0);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_0));
+}
+
+TEST_F(ValidateDecorations, BlockArrayWithoutStrideUntypedAccessChain) {
+  const std::string spirv = R"(
+OpCapability Shader
+OpCapability UntypedPointersKHR
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+OpExtension "SPV_KHR_untyped_pointers"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+OpExecutionMode %main LocalSize 1 1 1
+OpDecorate %struct Block
+OpMemberDecorate %struct 0 Offset 0
+OpDecorate %var DescriptorSet 0
+OpDecorate %var Binding 0
+%int = OpTypeInt 32 0
+%int_4 = OpConstant %int 4
+%struct = OpTypeStruct %int
+%array = OpTypeArray %struct %int_4
+%void = OpTypeVoid
+%ptr = OpTypeUntypedPointerKHR StorageBuffer
+%var = OpUntypedVariableKHR %ptr StorageBuffer %array
+%void_fn = OpTypeFunction %void
+%main = OpFunction %void None %void_fn
+%entry = OpLabel
+%gep = OpUntypedAccessChainKHR %ptr %array %var
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv, SPV_ENV_VULKAN_1_0);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_0));
 }
 
 }  // namespace
