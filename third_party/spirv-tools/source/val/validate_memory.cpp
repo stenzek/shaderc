@@ -380,6 +380,16 @@ spv_result_t CheckMemoryAccess(ValidationState_t& _, const Instruction* inst,
              << _.VkErrorID(4708)
              << "Memory accesses with PhysicalStorageBuffer must use Aligned.";
     }
+  } else {
+    // even if there are other masks, the Aligned operand will be next
+    const uint32_t aligned_value = inst->GetOperandAs<uint32_t>(index + 1);
+    const bool is_power_of_two =
+        aligned_value && !(aligned_value & (aligned_value - 1));
+    if (!is_power_of_two) {
+      return _.diag(SPV_ERROR_INVALID_ID, inst)
+             << "Memory accesses Aligned operand value " << aligned_value
+             << " is not a power of two.";
+    }
   }
 
   return SPV_SUCCESS;
@@ -700,33 +710,6 @@ spv_result_t ValidateVariable(ValidationState_t& _, const Instruction* inst) {
   if (storage_class == spv::StorageClass::PhysicalStorageBuffer) {
     return _.diag(SPV_ERROR_INVALID_ID, inst)
            << "PhysicalStorageBuffer must not be used with OpVariable.";
-  }
-
-  auto pointee_base = pointee;
-  while (pointee_base && pointee_base->opcode() == spv::Op::OpTypeArray) {
-    pointee_base = _.FindDef(pointee_base->GetOperandAs<uint32_t>(1u));
-  }
-  if (pointee_base && pointee_base->opcode() == spv::Op::OpTypePointer) {
-    if (pointee_base->GetOperandAs<spv::StorageClass>(1u) ==
-        spv::StorageClass::PhysicalStorageBuffer) {
-      // check for AliasedPointer/RestrictPointer
-      bool foundAliased =
-          _.HasDecoration(inst->id(), spv::Decoration::AliasedPointer);
-      bool foundRestrict =
-          _.HasDecoration(inst->id(), spv::Decoration::RestrictPointer);
-      if (!foundAliased && !foundRestrict) {
-        return _.diag(SPV_ERROR_INVALID_ID, inst)
-               << "OpVariable " << inst->id()
-               << ": expected AliasedPointer or RestrictPointer for "
-               << "PhysicalStorageBuffer pointer.";
-      }
-      if (foundAliased && foundRestrict) {
-        return _.diag(SPV_ERROR_INVALID_ID, inst)
-               << "OpVariable " << inst->id()
-               << ": can't specify both AliasedPointer and "
-               << "RestrictPointer for PhysicalStorageBuffer pointer.";
-      }
-    }
   }
 
   // Vulkan specific validation rules for OpTypeRuntimeArray
@@ -1608,9 +1591,10 @@ spv_result_t ValidateAccessChain(ValidationState_t& _,
         // index: the index must be an OpConstant.
         int64_t cur_index;
         if (!_.EvalConstantValInt64(cur_word, &cur_index)) {
-          return _.diag(SPV_ERROR_INVALID_ID, cur_word_instr)
-                 << "The <id> passed to " << instr_name
-                 << " to index into a "
+          return _.diag(SPV_ERROR_INVALID_ID, inst)
+                 << "The <id> passed to " << instr_name << " to index "
+                 << _.getIdName(cur_word)
+                 << " into a "
                     "structure must be an OpConstant.";
         }
 
@@ -1619,10 +1603,10 @@ spv_result_t ValidateAccessChain(ValidationState_t& _,
         const int64_t num_struct_members =
             static_cast<int64_t>(type_pointee->words().size() - 2);
         if (cur_index >= num_struct_members || cur_index < 0) {
-          return _.diag(SPV_ERROR_INVALID_ID, cur_word_instr)
-                 << "Index is out of bounds: " << instr_name
-                 << " cannot find index " << cur_index
-                 << " into the structure <id> "
+          return _.diag(SPV_ERROR_INVALID_ID, inst)
+                 << "Index " << _.getIdName(cur_word)
+                 << " is out of bounds: " << instr_name << " cannot find index "
+                 << cur_index << " into the structure <id> "
                  << _.getIdName(type_pointee->id()) << ". This structure has "
                  << num_struct_members << " members. Largest valid index is "
                  << num_struct_members - 1 << ".";
@@ -2807,15 +2791,40 @@ spv_result_t ValidatePtrComparison(ValidationState_t& _,
 
   const auto op1 = _.FindDef(inst->GetOperandAs<uint32_t>(2u));
   const auto op2 = _.FindDef(inst->GetOperandAs<uint32_t>(3u));
-  if (!op1 || !op2 || op1->type_id() != op2->type_id()) {
-    return _.diag(SPV_ERROR_INVALID_ID, inst)
-           << "The types of Operand 1 and Operand 2 must match";
-  }
   const auto op1_type = _.FindDef(op1->type_id());
+  const auto op2_type = _.FindDef(op2->type_id());
   if (!op1_type || (op1_type->opcode() != spv::Op::OpTypePointer &&
                     op1_type->opcode() != spv::Op::OpTypeUntypedPointerKHR)) {
     return _.diag(SPV_ERROR_INVALID_ID, inst)
            << "Operand type must be a pointer";
+  }
+
+  if (!op2_type || (op2_type->opcode() != spv::Op::OpTypePointer &&
+                    op2_type->opcode() != spv::Op::OpTypeUntypedPointerKHR)) {
+    return _.diag(SPV_ERROR_INVALID_ID, inst)
+           << "Operand type must be a pointer";
+  }
+
+  if (inst->opcode() == spv::Op::OpPtrDiff) {
+    if (op1->type_id() != op2->type_id()) {
+      return _.diag(SPV_ERROR_INVALID_ID, inst)
+             << "The types of Operand 1 and Operand 2 must match";
+    }
+  } else {
+    const auto either_untyped =
+        op1_type->opcode() == spv::Op::OpTypeUntypedPointerKHR ||
+        op2_type->opcode() == spv::Op::OpTypeUntypedPointerKHR;
+    if (either_untyped) {
+      const auto sc1 = op1_type->GetOperandAs<spv::StorageClass>(1);
+      const auto sc2 = op2_type->GetOperandAs<spv::StorageClass>(1);
+      if (sc1 != sc2) {
+        return _.diag(SPV_ERROR_INVALID_ID, inst)
+               << "Pointer storage classes must match";
+      }
+    } else if (op1->type_id() != op2->type_id()) {
+      return _.diag(SPV_ERROR_INVALID_ID, inst)
+             << "The types of Operand 1 and Operand 2 must match";
+    }
   }
 
   spv::StorageClass sc = op1_type->GetOperandAs<spv::StorageClass>(1u);
