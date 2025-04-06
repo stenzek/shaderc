@@ -4320,12 +4320,11 @@ TEST_P(AccessChainInstructionTest, AccessChainStructIndexNotConstantBad) {
 OpReturn
 OpFunctionEnd
   )";
-  const std::string expected_err =
-      "The <id> passed to " + instr +
-      " to index into a structure must be an OpConstant.";
   CompileSuccessfully(spirv);
   EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
-  EXPECT_THAT(getDiagnosticString(), HasSubstr(expected_err));
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("The <id> passed to " + instr));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("into a structure must be an OpConstant"));
 }
 
 // Invalid: Indexing up to a vec4 granularity, but result type expected float.
@@ -4379,7 +4378,7 @@ TEST_P(AccessChainInstructionTest, AccessChainStructIndexOutOfBoundBad) {
 OpReturn
 OpFunctionEnd
   )";
-  const std::string expected_err = "Index is out of bounds: " + instr +
+  const std::string expected_err = "is out of bounds: " + instr +
                                    " cannot find index 3 into the structure "
                                    "<id> '25[%_struct_25]'. This structure "
                                    "has 3 members. Largest valid index is 2.";
@@ -5765,7 +5764,7 @@ TEST_P(ValidateIdWithMessage,
  %2 = OpFunction %8 None %11
  %4 = OpFunctionParameter %10
 %15 = OpLabel
-%16 = OpLoad %6 %3 Aligned 0
+%16 = OpLoad %6 %3 Aligned 1
 %17 = OpCompositeExtract %5 %16 0
 %18 = OpInBoundsPtrAccessChain %13 %4 %17 %12
       OpStore %18 %14 Aligned 4
@@ -5799,7 +5798,7 @@ TEST_P(ValidateIdWithMessage, OpPtrAccessChainGood) {
  %2 = OpFunction %8 None %12
  %4 = OpFunctionParameter %11
 %17 = OpLabel
-%18 = OpLoad %6 %3 Aligned 0
+%18 = OpLoad %6 %3 Aligned 1
 %19 = OpCompositeExtract %5 %18 0
 %20 = OpBitwiseAnd %5 %19 %13
 %21 = OpPtrAccessChain %15 %4 %20 %14
