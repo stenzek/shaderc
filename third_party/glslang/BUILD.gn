@@ -143,8 +143,9 @@ template("glslang_sources_common") {
       "SPIRV/doc.cpp",
       "SPIRV/doc.h",
       "SPIRV/hex_float.h",
-      "SPIRV/spirv.hpp",
+      "SPIRV/spirv.hpp11",
       "SPIRV/spvIR.h",
+      "SPIRV/spvUtil.h",
       "glslang/GenericCodeGen/CodeGen.cpp",
       "glslang/GenericCodeGen/Link.cpp",
       "glslang/Include/BaseTypes.h",
@@ -334,20 +335,6 @@ executable("glslang_validator") {
     "${target_gen_dir}/include",
     "${spirv_tools_dir}/include",
   ]
-
-  configs -= _configs_to_remove
-  configs += _configs_to_add
-}
-
-executable("spirv-remap") {
-  sources = [ "StandAlone/spirv-remap.cpp" ]
-  defines = [
-    "ENABLE_OPT=1",
-    "ENABLE_SPIRV=1",
-  ]
-  deps = [ ":glslang_sources" ]
-
-  include_dirs = [ "${spirv_tools_dir}/include" ]
 
   configs -= _configs_to_remove
   configs += _configs_to_add
