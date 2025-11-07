@@ -112,7 +112,7 @@ if(${COMPILER_IS_LIKE_GNU})
     set(SPIRV_WARNINGS ${SPIRV_WARNINGS} -Werror)
   endif()
 elseif(MSVC)
-  set(SPIRV_WARNINGS -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS /wd4800 /wd4819)
+  set(SPIRV_WARNINGS -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS /wd4800 /wd4819 /wd4251 /W2 /WX)
 
   if(${SPIRV_WERROR})
     set(SPIRV_WARNINGS ${SPIRV_WARNINGS} /WX)
@@ -239,6 +239,20 @@ endif()
 
 # Tests require Python3
 find_host_package(Python3 REQUIRED)
+
+# Check type annotations in Perl code. Assumes mypy.
+add_custom_target(spirv-tools-check-python-types
+	COMMAND mypy Table
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/utils
+)
+set_target_properties(spirv-tools-check-python-types
+  PROPERTIES EXCLUDE_FROM_ALL ON)
+
+# Run Python unit tests
+add_custom_target(spirv-tools-check-python-tests
+	COMMAND Python3::Interpreter -m unittest discover -v -p "*test.py"
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/utils
+)
 
 # Check for symbol exports on Linux.
 # At the moment, this check will fail on the OSX build machines for the Android NDK.
