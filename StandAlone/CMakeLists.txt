@@ -59,7 +59,8 @@ glslang_set_link_args(glslang-standalone)
 
 set(LIBRARIES
     glslang
-    glslang-default-resource-limits)
+    glslang-default-resource-limits
+    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
 
 if(WIN32)
     set(LIBRARIES ${LIBRARIES} psapi)
@@ -72,16 +73,6 @@ endif()
 target_link_libraries(glslang-standalone ${LIBRARIES})
 target_include_directories(glslang-standalone PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../External>)
-
-if(ENABLE_SPIRV)
-    if(ENABLE_SPVREMAPPER)
-        set(REMAPPER_SOURCES spirv-remap.cpp)
-        add_executable(spirv-remap ${REMAPPER_SOURCES})
-        set_property(TARGET spirv-remap PROPERTY FOLDER tools)
-        glslang_set_link_args(spirv-remap)
-        target_link_libraries(spirv-remap SPVRemapper ${LIBRARIES})
-    endif()
-endif()
 
 if(WIN32)
     source_group("Source" FILES ${SOURCES})
@@ -113,9 +104,4 @@ if(GLSLANG_ENABLE_INSTALL)
         )
     ")
 
-    if(ENABLE_SPIRV)
-        if(ENABLE_SPVREMAPPER)
-            install(TARGETS spirv-remap EXPORT glslang-targets)
-        endif()
-    endif()
 endif()
