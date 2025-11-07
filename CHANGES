@@ -1,7 +1,22 @@
 Revision history for Shaderc
 
-v2025.2-dev
- - Start v2025.2 development
+v2025.4
+ - Update dependencies
+ - Add option to set max SPIR-V ID bound.
+    glslc: -fmax-id-bound
+ - CMake: Fix some install logic: when glslc is not built,
+    don't try to install it.
+ - Remove testing of VS 2019
+
+v2025.3
+ - Update dependencies
+ - CMake updates:
+    - Actually disable all tests when specified
+    - Add a way to disable building glslc
+
+v2025.2
+ - Update dependencies: Glslang, SPIRV-Tools, SPIRV-Headers
+ - Supports BFloat16 floating point types
 
 v2025.1
  - Update tools and compilers tested:

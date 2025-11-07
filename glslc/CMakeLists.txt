@@ -48,12 +48,14 @@ target_link_libraries(glslc PRIVATE
   shaderc_util shaderc                                  # internal Shaderc libraries
   ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(glslc_exe src/main.cc)
-shaderc_default_compile_options(glslc_exe)
-target_include_directories(glslc_exe PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/.. ${spirv-tools_SOURCE_DIR}/include)
-set_target_properties(glslc_exe PROPERTIES OUTPUT_NAME glslc)
-target_link_libraries(glslc_exe PRIVATE glslc shaderc_util shaderc)
-add_dependencies(glslc_exe build-version)
+if(SHADERC_ENABLE_EXECUTABLES)
+  add_executable(glslc_exe src/main.cc)
+  shaderc_default_compile_options(glslc_exe)
+  target_include_directories(glslc_exe PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/.. ${spirv-tools_SOURCE_DIR}/include)
+  set_target_properties(glslc_exe PROPERTIES OUTPUT_NAME glslc)
+  target_link_libraries(glslc_exe PRIVATE glslc shaderc_util shaderc)
+  add_dependencies(glslc_exe build-version)
+endif(SHADERC_ENABLE_EXECUTABLES)
 
 shaderc_add_tests(
   TEST_PREFIX glslc
@@ -66,9 +68,11 @@ shaderc_add_tests(
 shaderc_add_asciidoc(glslc_doc_README README)
 
 if(SHADERC_ENABLE_INSTALL)
-  install(TARGETS glslc_exe
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR})
+  if(SHADERC_ENABLE_EXECUTABLES)
+    install(TARGETS glslc_exe
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif(SHADERC_ENABLE_EXECUTABLES)
 endif(SHADERC_ENABLE_INSTALL)
 
 add_subdirectory(test)
