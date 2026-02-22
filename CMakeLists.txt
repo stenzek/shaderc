@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.22.1)
 
-project(shaderc VERSION 2024.3 LANGUAGES C CXX)
+project(shaderc VERSION 2026.1 LANGUAGES C CXX)
 enable_testing()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
