@@ -271,6 +271,7 @@ set(SPIRV_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_layout.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_literals.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_logicals.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_logical_pointers.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_memory.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_memory_semantics.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/val/validate_mesh_shading.cpp
@@ -407,8 +408,3 @@ if(ENABLE_SPIRV_TOOLS_INSTALL)
     "endif()\n")
   install(FILES ${CMAKE_BINARY_DIR}/${SPIRV_TOOLS}Config.cmake DESTINATION ${PACKAGE_DIR})
 endif(ENABLE_SPIRV_TOOLS_INSTALL)
-
-if(MSVC AND (NOT ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")))
-  # Enable parallel builds across four cores for this lib
-  add_definitions(/MP4)
-endif()

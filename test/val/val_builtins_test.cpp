@@ -141,7 +141,11 @@ CodeGenerator GetInMainCodeGenerator(const char* const built_in,
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " OutputPoints\n";
   }
-  if (0 == std::strcmp(execution_model, "GLCompute")) {
+  if (0 == std::strcmp(execution_model, "GLCompute") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "MeshNV") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "TaskNV")) {
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " LocalSize 1 1 1\n";
   }
@@ -303,7 +307,11 @@ CodeGenerator GetInFunctionCodeGenerator(const char* const built_in,
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " OutputPoints\n";
   }
-  if (0 == std::strcmp(execution_model, "GLCompute")) {
+  if (0 == std::strcmp(execution_model, "GLCompute") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "MeshNV") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "TaskNV")) {
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " LocalSize 1 1 1\n";
   }
@@ -434,7 +442,7 @@ CodeGenerator GetVariableCodeGenerator(const char* const built_in,
   }
   // Any kind of reference would do.
   entry_point.body = R"(
-%val = OpBitcast %u32 %built_in_var
+%val = OpCopyObject %built_in_ptr %built_in_var
 )";
 
   std::ostringstream execution_modes;
@@ -452,7 +460,11 @@ CodeGenerator GetVariableCodeGenerator(const char* const built_in,
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " OutputPoints\n";
   }
-  if (0 == std::strcmp(execution_model, "GLCompute")) {
+  if (0 == std::strcmp(execution_model, "GLCompute") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "MeshNV") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "TaskNV")) {
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " LocalSize 1 1 1\n";
   }
@@ -856,6 +868,45 @@ INSTANTIATE_TEST_SUITE_P(
             Values(TestResult(SPV_ERROR_INVALID_DATA,
                               "needs to be a 3-component 32-bit int vector",
                               "has components with bit width 64"))));
+
+INSTANTIATE_TEST_SUITE_P(
+    LocalInvocationIndexSuccess,
+    ValidateVulkanCombineBuiltInExecutionModelDataTypeResult,
+    Combine(Values("LocalInvocationIndex"), Values("GLCompute"),
+            Values("Input"), Values("%u32"), Values(nullptr),
+            Values(TestResult())));
+
+INSTANTIATE_TEST_SUITE_P(
+    LocalInvocationIndexNotGLCompute,
+    ValidateVulkanCombineBuiltInExecutionModelDataTypeResult,
+    Combine(Values("LocalInvocationIndex"),
+            Values("Vertex", "Fragment", "Geometry", "TessellationControl",
+                   "TessellationEvaluation"),
+            Values("Input"), Values("%u32"),
+            Values("VUID-LocalInvocationIndex-LocalInvocationIndex-04284"),
+            Values(TestResult(SPV_ERROR_INVALID_DATA,
+                              "to be used only with GLCompute, MeshNV, "
+                              "TaskNV, MeshEXT or TaskEXT execution model"))));
+
+INSTANTIATE_TEST_SUITE_P(
+    LocalInvocationIndexNotInput,
+    ValidateVulkanCombineBuiltInExecutionModelDataTypeResult,
+    Combine(Values("LocalInvocationIndex"), Values("GLCompute"),
+            Values("Output"), Values("%u32"),
+            Values("VUID-LocalInvocationIndex-LocalInvocationIndex-04285"),
+            Values(TestResult(
+                SPV_ERROR_INVALID_DATA,
+                "to be only used for variables with Input storage class",
+                "uses storage class Output"))));
+
+INSTANTIATE_TEST_SUITE_P(
+    LocalInvocationIndexNot32Int,
+    ValidateVulkanCombineBuiltInExecutionModelDataTypeResult,
+    Combine(Values("LocalInvocationIndex"), Values("GLCompute"),
+            Values("Input"), Values("%u32vec3", "%f32"),
+            Values("VUID-LocalInvocationIndex-LocalInvocationIndex-04286"),
+            Values(TestResult(SPV_ERROR_INVALID_DATA,
+                              "needs to be a 32-bit int scalar"))));
 
 INSTANTIATE_TEST_SUITE_P(
     InvocationIdSuccess,
@@ -2646,7 +2697,7 @@ CodeGenerator GetArrayedVariableCodeGenerator(const char* const built_in,
   entry_point.interfaces = "%built_in_var";
   // Any kind of reference would do.
   entry_point.body = R"(
-%val = OpBitcast %u32 %built_in_var
+%val = OpCopyObject %built_in_ptr %built_in_var
 )";
 
   std::ostringstream execution_modes;
@@ -2664,7 +2715,11 @@ CodeGenerator GetArrayedVariableCodeGenerator(const char* const built_in,
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " OutputPoints\n";
   }
-  if (0 == std::strcmp(execution_model, "GLCompute")) {
+  if (0 == std::strcmp(execution_model, "GLCompute") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "MeshNV") ||
+      0 == std::strcmp(execution_model, "MeshEXT") ||
+      0 == std::strcmp(execution_model, "TaskNV")) {
     execution_modes << "OpExecutionMode %" << entry_point.name
                     << " LocalSize 1 1 1\n";
   }
@@ -3576,6 +3631,7 @@ OpDecorate %gl_ViewportIndex PerPrimitiveNV
   EntryPoint entry_point;
   entry_point.name = "main_d_r";
   entry_point.execution_model = "MeshNV";
+  entry_point.execution_modes = "OpExecutionMode %main_d_r LocalSize 1 1 1";
   entry_point.interfaces = "%gl_PrimitiveID %gl_Layer %gl_ViewportIndex";
   generator.entry_points_.push_back(std::move(entry_point));
 
@@ -3614,6 +3670,7 @@ OpDecorate %gl_ViewportIndex PerPrimitiveNV
   EntryPoint entry_point;
   entry_point.name = "main_d_r";
   entry_point.execution_model = "MeshNV";
+  entry_point.execution_modes = "OpExecutionMode %main_d_r LocalSize 1 1 1";
   entry_point.interfaces = "%gl_PrimitiveID %gl_Layer %gl_ViewportIndex";
   entry_point.body = "%ref_load = OpLoad %_arr_float_uint_81 %gl_PrimitiveID";
   generator.entry_points_.push_back(std::move(entry_point));
@@ -5190,6 +5247,320 @@ TEST_F(ValidateBuiltIns, BadVulkanPrimitiveTriangleIndicesArraySizeMeshEXT) {
                       "PrimitiveTriangleIndicesEXT-07058"));
 }
 
+// https://godbolt.org/z/xqsMqqnxd
+TEST_F(ValidateBuiltIns, VulkanMeshMultipleTopology) {
+  const std::string text = R"(
+               OpCapability MeshShadingEXT
+               OpCapability Shader
+               OpExtension "SPV_EXT_mesh_shader"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint MeshEXT %main1 "main1" %26 %vertices_color
+               OpEntryPoint MeshEXT %main2 "main2" %43 %vertices_color_0
+               OpExecutionMode %main1 OutputVertices 3
+               OpExecutionMode %main1 OutputPrimitivesEXT 1
+               OpExecutionMode %main1 LocalSize 1 1 1
+               OpExecutionMode %main1 OutputTrianglesEXT
+               OpExecutionMode %main2 OutputVertices 3
+               OpExecutionMode %main2 OutputPrimitivesEXT 1
+               OpExecutionMode %main2 LocalSize 1 1 1
+               OpExecutionMode %main2 OutputLinesEXT
+               OpDecorate %vertices_color Location 0
+               OpDecorate %26 BuiltIn PrimitiveTriangleIndicesEXT
+               OpDecorate %vertices_color_0 Location 0
+               OpDecorate %43 BuiltIn PrimitiveLineIndicesEXT
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_3 = OpConstant %uint 3
+     %uint_1 = OpConstant %uint 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+        %int = OpTypeInt 32 1
+      %int_3 = OpConstant %int 3
+%_arr_v4float_int_3 = OpTypeArray %v4float %int_3
+%_ptr_Output__arr_v4float_int_3 = OpTypePointer Output %_arr_v4float_int_3
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+         %19 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+     %v3uint = OpTypeVector %uint 3
+      %int_1 = OpConstant %int 1
+%_arr_v3uint_int_1 = OpTypeArray %v3uint %int_1
+%_ptr_Output__arr_v3uint_int_1 = OpTypePointer Output %_arr_v3uint_int_1
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+     %uint_2 = OpConstant %uint 2
+         %29 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+         %38 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+     %v2uint = OpTypeVector %uint 2
+%_arr_v2uint_int_1 = OpTypeArray %v2uint %int_1
+%_ptr_Output__arr_v2uint_int_1 = OpTypePointer Output %_arr_v2uint_int_1
+%_ptr_Output_v2uint = OpTypePointer Output %v2uint
+         %46 = OpConstantComposite %v2uint %uint_0 %uint_1
+%vertices_color = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+         %26 = OpVariable %_ptr_Output__arr_v3uint_int_1 Output
+%vertices_color_0 = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+         %43 = OpVariable %_ptr_Output__arr_v2uint_int_1 Output
+      %main1 = OpFunction %void None %3
+          %4 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %17 = OpAccessChain %_ptr_Output_v4float %vertices_color %uint_0
+               OpStore %17 %19
+         %28 = OpAccessChain %_ptr_Output_v3uint %26 %uint_0
+               OpStore %28 %29
+               OpReturn
+               OpFunctionEnd
+      %main2 = OpFunction %void None %3
+         %34 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %37 = OpAccessChain %_ptr_Output_v4float %vertices_color_0 %uint_0
+               OpStore %37 %38
+         %45 = OpAccessChain %_ptr_Output_v2uint %43 %uint_0
+               OpStore %45 %46
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(text, SPV_ENV_VULKAN_1_3);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_3));
+}
+
+// https://godbolt.org/z/MeTadeYEr
+TEST_F(ValidateBuiltIns, VulkanMeshMultipleArraySizes) {
+  const std::string text = R"(
+    OpCapability MeshShadingEXT
+               OpCapability Shader
+               OpExtension "SPV_EXT_mesh_shader"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint MeshEXT %main1 "main1" %var1 %vertices_color
+               OpEntryPoint MeshEXT %main2 "main2" %var2 %vertices_color_0
+               OpExecutionMode %main1 OutputVertices 3
+               OpExecutionMode %main1 OutputPrimitivesEXT 2
+               OpExecutionMode %main1 LocalSize 1 1 1
+               OpExecutionMode %main1 OutputTrianglesEXT
+               OpExecutionMode %main2 OutputVertices 3
+               OpExecutionMode %main2 OutputPrimitivesEXT 4
+               OpExecutionMode %main2 LocalSize 1 1 1
+               OpExecutionMode %main2 OutputTrianglesEXT
+               OpSource Slang 1
+               OpName %vertices_color "vertices.color"
+               OpName %main1 "main1"
+               OpName %vertices_color_0 "vertices.color"
+               OpName %main2 "main2"
+               OpDecorate %vertices_color Location 0
+               OpDecorate %var1 BuiltIn PrimitiveTriangleIndicesEXT
+               OpDecorate %var2 BuiltIn PrimitiveTriangleIndicesEXT
+               OpDecorate %vertices_color_0 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_3 = OpConstant %uint 3
+     %uint_1 = OpConstant %uint 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+        %int = OpTypeInt 32 1
+      %int_3 = OpConstant %int 3
+%_arr_v4float_int_3 = OpTypeArray %v4float %int_3
+%_ptr_Output__arr_v4float_int_3 = OpTypePointer Output %_arr_v4float_int_3
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+         %19 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+     %v3uint = OpTypeVector %uint 3
+      %int_2 = OpConstant %int 2
+      %int_4 = OpConstant %int 4
+%_arr_v3uint_int_2 = OpTypeArray %v3uint %int_2
+%_arr_v3uint_int_4 = OpTypeArray %v3uint %int_4
+%_ptr_Output__arr_v3uint_int_2 = OpTypePointer Output %_arr_v3uint_int_2
+%_ptr_Output__arr_v3uint_int_4 = OpTypePointer Output %_arr_v3uint_int_4
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+     %uint_2 = OpConstant %uint 2
+         %29 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+         %38 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+         %41 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+%vertices_color = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+         %var1 = OpVariable %_ptr_Output__arr_v3uint_int_2 Output
+         %var2 = OpVariable %_ptr_Output__arr_v3uint_int_4 Output
+%vertices_color_0 = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+      %main1 = OpFunction %void None %3
+          %4 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %17 = OpAccessChain %_ptr_Output_v4float %vertices_color %uint_0
+               OpStore %17 %19
+         %28 = OpAccessChain %_ptr_Output_v3uint %var1 %uint_0
+               OpStore %28 %29
+               OpReturn
+               OpFunctionEnd
+      %main2 = OpFunction %void None %3
+         %34 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %37 = OpAccessChain %_ptr_Output_v4float %vertices_color_0 %uint_0
+               OpStore %37 %38
+         %40 = OpAccessChain %_ptr_Output_v3uint %var2 %uint_0
+               OpStore %40 %41
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(text, SPV_ENV_VULKAN_1_3);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_3));
+}
+
+TEST_F(ValidateBuiltIns, BadVulkanMeshMultipleArraySizes) {
+  const std::string text = R"(
+                 OpCapability MeshShadingEXT
+               OpCapability Shader
+               OpExtension "SPV_EXT_mesh_shader"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint MeshEXT %main1 "main1" %26 %vertices_color
+               OpEntryPoint MeshEXT %main2 "main2" %26 %vertices_color_0
+               OpExecutionMode %main1 OutputVertices 3
+               OpExecutionMode %main1 OutputPrimitivesEXT 2
+               OpExecutionMode %main1 LocalSize 1 1 1
+               OpExecutionMode %main1 OutputTrianglesEXT
+               OpExecutionMode %main2 OutputVertices 3
+               OpExecutionMode %main2 OutputPrimitivesEXT 42
+               OpExecutionMode %main2 LocalSize 1 1 1
+               OpExecutionMode %main2 OutputTrianglesEXT
+               OpSource Slang 1
+               OpName %vertices_color "vertices.color"
+               OpName %main1 "main1"
+               OpName %vertices_color_0 "vertices.color"
+               OpName %main2 "main2"
+               OpDecorate %vertices_color Location 0
+               OpDecorate %26 BuiltIn PrimitiveTriangleIndicesEXT
+               OpDecorate %vertices_color_0 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_3 = OpConstant %uint 3
+     %uint_1 = OpConstant %uint 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+        %int = OpTypeInt 32 1
+      %int_3 = OpConstant %int 3
+%_arr_v4float_int_3 = OpTypeArray %v4float %int_3
+%_ptr_Output__arr_v4float_int_3 = OpTypePointer Output %_arr_v4float_int_3
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+         %19 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+     %v3uint = OpTypeVector %uint 3
+      %int_2 = OpConstant %int 2
+%_arr_v3uint_int_2 = OpTypeArray %v3uint %int_2
+%_ptr_Output__arr_v3uint_int_2 = OpTypePointer Output %_arr_v3uint_int_2
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+     %uint_2 = OpConstant %uint 2
+         %29 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+         %38 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+         %41 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+%vertices_color = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+         %26 = OpVariable %_ptr_Output__arr_v3uint_int_2 Output
+%vertices_color_0 = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+      %main1 = OpFunction %void None %3
+          %4 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %17 = OpAccessChain %_ptr_Output_v4float %vertices_color %uint_0
+               OpStore %17 %19
+         %28 = OpAccessChain %_ptr_Output_v3uint %26 %uint_0
+               OpStore %28 %29
+               OpReturn
+               OpFunctionEnd
+      %main2 = OpFunction %void None %3
+         %34 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %37 = OpAccessChain %_ptr_Output_v4float %vertices_color_0 %uint_0
+               OpStore %37 %38
+         %40 = OpAccessChain %_ptr_Output_v3uint %26 %uint_0
+               OpStore %40 %41
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(text, SPV_ENV_VULKAN_1_3);
+  EXPECT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions(SPV_ENV_VULKAN_1_3));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-PrimitiveTriangleIndicesEXT-"
+                      "PrimitiveTriangleIndicesEXT-07058"));
+}
+
+TEST_F(ValidateBuiltIns, BadVulkanMeshMultipleArraySizesSharedVariable) {
+  const std::string text = R"(
+               OpCapability MeshShadingEXT
+               OpCapability Shader
+               OpExtension "SPV_EXT_mesh_shader"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint MeshEXT %main1 "main1" %26 %vertices_color
+               OpEntryPoint MeshEXT %main2 "main2" %26 %vertices_color_0
+               OpExecutionMode %main1 OutputVertices 3
+               OpExecutionMode %main1 OutputPrimitivesEXT 2
+               OpExecutionMode %main1 LocalSize 1 1 1
+               OpExecutionMode %main1 OutputTrianglesEXT
+               OpExecutionMode %main2 OutputVertices 3
+               OpExecutionMode %main2 OutputPrimitivesEXT 4
+               OpExecutionMode %main2 LocalSize 1 1 1
+               OpExecutionMode %main2 OutputTrianglesEXT
+               OpSource Slang 1
+               OpName %vertices_color "vertices.color"
+               OpName %main1 "main1"
+               OpName %vertices_color_0 "vertices.color"
+               OpName %main2 "main2"
+               OpDecorate %vertices_color Location 0
+               OpDecorate %26 BuiltIn PrimitiveTriangleIndicesEXT
+               OpDecorate %vertices_color_0 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_3 = OpConstant %uint 3
+     %uint_1 = OpConstant %uint 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+        %int = OpTypeInt 32 1
+      %int_3 = OpConstant %int 3
+%_arr_v4float_int_3 = OpTypeArray %v4float %int_3
+%_ptr_Output__arr_v4float_int_3 = OpTypePointer Output %_arr_v4float_int_3
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+         %19 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+     %v3uint = OpTypeVector %uint 3
+      %int_2 = OpConstant %int 2
+%_arr_v3uint_int_2 = OpTypeArray %v3uint %int_2
+%_ptr_Output__arr_v3uint_int_2 = OpTypePointer Output %_arr_v3uint_int_2
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+     %uint_2 = OpConstant %uint 2
+         %29 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+         %38 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+         %41 = OpConstantComposite %v3uint %uint_0 %uint_1 %uint_2
+%vertices_color = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+         %26 = OpVariable %_ptr_Output__arr_v3uint_int_2 Output
+%vertices_color_0 = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+      %main1 = OpFunction %void None %3
+          %4 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %17 = OpAccessChain %_ptr_Output_v4float %vertices_color %uint_0
+               OpStore %17 %19
+         %28 = OpAccessChain %_ptr_Output_v3uint %26 %uint_0
+               OpStore %28 %29
+               OpReturn
+               OpFunctionEnd
+      %main2 = OpFunction %void None %3
+         %34 = OpLabel
+               OpSetMeshOutputsEXT %uint_3 %uint_1
+         %37 = OpAccessChain %_ptr_Output_v4float %vertices_color_0 %uint_0
+               OpStore %37 %38
+         %40 = OpAccessChain %_ptr_Output_v3uint %26 %uint_0
+               OpStore %40 %41
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(text, SPV_ENV_VULKAN_1_3);
+  EXPECT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions(SPV_ENV_VULKAN_1_3));
+  EXPECT_THAT(getDiagnosticString(),
+              AnyVUID("VUID-PrimitiveTriangleIndicesEXT-"
+                      "PrimitiveTriangleIndicesEXT-07058"));
+}
+
 TEST_F(ValidateBuiltIns, BadExecModelVulkanPrimitivePointIndicesEXT) {
   const std::string text = R"(
   OpCapability MeshShadingNV
@@ -6155,16 +6526,20 @@ TEST_F(ValidateBuiltIns,
 %void = OpTypeVoid
  %3 = OpTypeFunction %void
 %uint = OpTypeInt 32 0
+%int = OpTypeInt 32 1
 %uint_32 = OpConstant %uint 32
 %uint_1 = OpConstant %uint 1
-%int = OpTypeInt 32 1
+%uint_0 = OpConstant %uint 0
+%int_0 = OpConstant %int 0
 %bool = OpTypeBool
 %_arr_gl_PrimitiveShadingRateEXT_uint_32 = OpTypeArray %int %uint_32
 %_ptr_Output__arr_gl_PrimitiveShadingRateEXT_uint_32 = OpTypePointer Output %_arr_gl_PrimitiveShadingRateEXT_uint_32
 %gl_PrimitiveShadingRateEXT = OpVariable %_ptr_Output__arr_gl_PrimitiveShadingRateEXT_uint_32 Output
+%uint_ptr = OpTypePointer Output %int
 %main = OpFunction %void None %3
  %5 = OpLabel
-%ref_load = OpLoad %_arr_gl_PrimitiveShadingRateEXT_uint_32 %gl_PrimitiveShadingRateEXT
+      %21 = OpAccessChain %uint_ptr %gl_PrimitiveShadingRateEXT %uint_0
+      OpStore %21 %int_0
       OpReturn
       OpFunctionEnd
 )";

@@ -177,6 +177,7 @@ std::vector<std::unique_ptr<Type>> GenerateAllTypes() {
   types.emplace_back(new CooperativeMatrixKHR(f32, 8, 8, 8, 1002));
   types.emplace_back(new RayQueryKHR());
   types.emplace_back(new HitObjectNV());
+  types.emplace_back(new HitObjectEXT());
   types.emplace_back(new CooperativeVectorNV(f32, 16));
 
   // SPV_AMDX_shader_enqueue
@@ -189,6 +190,9 @@ std::vector<std::unique_ptr<Type>> GenerateAllTypes() {
   auto* tensor_f32_ranked = types.back().get();
   types.emplace_back(new TensorARM(f32, 4, 44));
   auto* tensor_f32_shaped = types.back().get();
+
+  // BufferEXT (SPV_EXT_descriptor_heap)
+  types.emplace_back(new BufferEXT(spv::StorageClass::StorageBuffer));
 
   // Graph
   types.emplace_back(new GraphARM(0, {tensor_f32}));
