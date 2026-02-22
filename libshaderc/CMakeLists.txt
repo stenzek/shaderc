@@ -37,12 +37,6 @@ target_compile_definitions(shaderc_shared
     PUBLIC SHADERC_SHAREDLIB
 )
 
-# Use a different shared library name on Linux, to avoid conflicts with
-# the shaderc distributed with the Vulkan SDK.
-if(NOT WIN32)
-  set_target_properties(shaderc_shared PROPERTIES OUTPUT_NAME "shaderc_ds")
-endif()
-
 if(SHADERC_ENABLE_INSTALL)
   install(
     FILES
