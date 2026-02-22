@@ -59,6 +59,7 @@ set(SPIRV_TOOLS_OPT_SOURCES
   fold_spec_constant_op_and_composite_pass.h
   freeze_spec_constant_value_pass.h
   function.h
+  graph.h
   graphics_robust_access_pass.h
   if_conversion.h
   inline_exhaustive_pass.h
@@ -181,6 +182,7 @@ set(SPIRV_TOOLS_OPT_SOURCES
   fold_spec_constant_op_and_composite_pass.cpp
   freeze_spec_constant_value_pass.cpp
   function.cpp
+  graph.cpp
   graphics_robust_access_pass.cpp
   if_conversion.cpp
   inline_exhaustive_pass.cpp
@@ -254,11 +256,6 @@ set(SPIRV_TOOLS_OPT_SOURCES
   workaround1209.cpp
   wrap_opkill.cpp
 )
-
-if(MSVC AND (NOT ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")))
-  # Enable parallel builds across four cores for this lib
-  add_definitions(/MP4)
-endif()
 
 spvtools_pch(SPIRV_TOOLS_OPT_SOURCES pch_source_opt)
 

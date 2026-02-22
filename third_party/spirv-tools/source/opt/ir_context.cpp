@@ -93,6 +93,9 @@ void IRContext::BuildInvalidAnalyses(IRContext::Analysis set) {
   if (set & kAnalysisLiveness) {
     BuildLivenessManager();
   }
+  if (set & kAnalysisIdToGraphMapping) {
+    BuildIdToGraphMapping();
+  }
 }
 
 void IRContext::InvalidateAnalysesExceptFor(
@@ -164,6 +167,9 @@ void IRContext::InvalidateAnalyses(IRContext::Analysis analyses_to_invalidate) {
   if (analyses_to_invalidate & kAnalysisDebugInfo) {
     debug_info_mgr_.reset(nullptr);
   }
+  if (analyses_to_invalidate & kAnalysisIdToGraphMapping) {
+    id_to_graph_.clear();
+  }
 
   valid_analyses_ = Analysis(valid_analyses_ & ~analyses_to_invalidate);
 }
@@ -176,6 +182,8 @@ Instruction* IRContext::KillInst(Instruction* inst) {
   KillNamesAndDecorates(inst);
 
   KillOperandFromDebugInstructions(inst);
+
+  KillRelatedDebugScopes(inst);
 
   if (AreAnalysesValid(kAnalysisDefUse)) {
     analysis::DefUseManager* def_use_mgr = get_def_use_mgr();
@@ -393,6 +401,14 @@ bool IRContext::IsConsistent() {
     }
   }
 
+  if (AreAnalysesValid(kAnalysisIdToGraphMapping)) {
+    for (auto& g : module_->graphs()) {
+      if (id_to_graph_[g->DefInst().result_id()] != g.get()) {
+        return false;
+      }
+    }
+  }
+
   if (AreAnalysesValid(kAnalysisInstrToBlockMapping)) {
     for (auto& func : *module()) {
       for (auto& block : func) {
@@ -518,6 +534,20 @@ void IRContext::KillOperandFromDebugInstructions(Instruction* inst) {
   }
 }
 
+void IRContext::KillRelatedDebugScopes(Instruction* inst) {
+  // Extension has been fully unloaded, remove debug scope from every
+  // instruction.
+  if (inst->opcode() == spv::Op::OpExtInstImport) {
+    const std::string extension_name = inst->GetInOperand(0).AsString();
+    if (extension_name == "NonSemantic.Shader.DebugInfo.100" ||
+        extension_name == "OpenCL.DebugInfo.100") {
+      module()->ForEachInst([](Instruction* child) {
+        child->SetDebugScope(DebugScope(kNoDebugScope, kNoInlinedAt));
+      });
+    }
+  }
+}
+
 void IRContext::AddCombinatorsForCapability(uint32_t capability) {
   spv::Capability cap = spv::Capability(capability);
   if (cap == spv::Capability::Shader) {
@@ -543,6 +573,7 @@ void IRContext::AddCombinatorsForCapability(uint32_t capability) {
          (uint32_t)spv::Op::OpTypeAccelerationStructureKHR,
          (uint32_t)spv::Op::OpTypeRayQueryKHR,
          (uint32_t)spv::Op::OpTypeHitObjectNV,
+         (uint32_t)spv::Op::OpTypeHitObjectEXT,
          (uint32_t)spv::Op::OpTypeArray,
          (uint32_t)spv::Op::OpTypeRuntimeArray,
          (uint32_t)spv::Op::OpTypeNodePayloadArrayAMDX,
@@ -913,11 +944,13 @@ uint32_t IRContext::GetBuiltinInputVarId(uint32_t builtin) {
         return 0;
       }
     }
+    if (reg_type == nullptr) return 0;  // Error
+
     uint32_t type_id = type_mgr->GetTypeInstruction(reg_type);
     uint32_t varTyPtrId =
         type_mgr->FindPointerToType(type_id, spv::StorageClass::Input);
-    // TODO(1841): Handle id overflow.
     var_id = TakeNextId();
+    if (var_id == 0) return 0;  // Error
     std::unique_ptr<Instruction> newVarOp(
         new Instruction(this, spv::Op::OpVariable, varTyPtrId, var_id,
                         {{spv_operand_type_t::SPV_OPERAND_TYPE_LITERAL_INTEGER,
