@@ -22,17 +22,17 @@ set -x
 
 # This is required to run any git command in the docker since owner will
 # have changed between the clone environment, and the docker container.
-# Marking the root of the repo as safe for ownership changes.
-git config --global --add safe.directory $ROOT_DIR
+# Mark all repositories as safe for ownership changes.
+git config --global --add safe.directory '*'
 
 . /bin/using.sh # Declare the bash `using` function for configuring toolchains.
 
 using python-3.12
 
 if [ $COMPILER = "clang" ]; then
-  using clang-13.0.1
+  using clang-18
 elif [ $COMPILER = "gcc" ]; then
-  using gcc-13
+  using gcc-15
 fi
 
 cd $ROOT_DIR
@@ -58,7 +58,7 @@ if [ $TOOL = "cmake" ]; then
   # ASAN, UBSAN, COVERAGE, RELEASE, DEBUG, DEBUG_EXCEPTION, RELEASE_MINGW
   BUILD_TYPE="Debug"
   if [ $CONFIG = "RELEASE" ] || [ $CONFIG = "RELEASE_MINGW" ]; then
-    BUILD_TYPE="RelWithDebInfo"
+    BUILD_TYPE="Release"
   fi
 
   SKIP_TESTS="False"
@@ -83,8 +83,13 @@ if [ $TOOL = "cmake" ]; then
     SKIP_TESTS="True"
   fi
 
-  if [ $COMPILER = "clang" ]; then
+  # Build fuzzers on selected configurations.
+  if [ $COMPILER-$CONFIG = "clang-RELEASE" ]; then
+    # Build targets that fuzz the assembler, binary parser, disassembler,
+    # optimizer, and validator.
     ADDITIONAL_CMAKE_FLAGS="$ADDITIONAL_CMAKE_FLAGS -DSPIRV_BUILD_LIBFUZZER_TARGETS=ON"
+    # Build spirv-fuzz, including its protobuf dependency
+    ADDITIONAL_CMAKE_FLAGS="$ADDITIONAL_CMAKE_FLAGS -DSPIRV_BUILD_FUZZER=ON"
   fi
 
   clean_dir "$ROOT_DIR/build"
@@ -195,7 +200,7 @@ elif [ $TOOL = "cmake-dxc-smoketest" ]; then
 
 elif [ $TOOL = "cmake-android-ndk" ]; then
   using cmake-3.31.2
-  using ndk-r27c
+  using ndk-r29
   using ninja-1.10.0
 
   clean_dir "$ROOT_DIR/build"
@@ -215,7 +220,7 @@ elif [ $TOOL = "cmake-android-ndk" ]; then
   ninja
   echo $(date): Build completed.
 elif [ $TOOL = "android-ndk-build" ]; then
-  using ndk-r27c
+  using ndk-r29
 
   clean_dir "$ROOT_DIR/build"
   cd "$ROOT_DIR/build"

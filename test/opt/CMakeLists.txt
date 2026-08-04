@@ -27,6 +27,7 @@ add_spvtools_unittest(TARGET opt
        cfg_test.cpp
        code_sink_test.cpp
        combine_access_chains_test.cpp
+       coop_matrix_decode_vector_opt_test.cpp
        compact_ids_test.cpp
        constants_test.cpp
        constant_manager_test.cpp
@@ -70,6 +71,7 @@ add_spvtools_unittest(TARGET opt
        ir_loader_test.cpp
        iterator_test.cpp
        line_debug_info_test.cpp
+       legalize_multidim_array_test.cpp
        local_access_chain_convert_test.cpp
        local_redundancy_elimination_test.cpp
        local_single_block_elim.cpp
@@ -123,10 +125,9 @@ add_spvtools_unittest(TARGET opt
 )
 if (NOT "${SPIRV_SKIP_TESTS}" AND TARGET gmock_main)
   if (MSVC)
-    if (${MSVC_VERSION} LESS 1920)
-      # The VS 2017 debug build requires /bigobj on test_opt
-      # https://github.com/KhronosGroup/SPIRV-Tools/issues/5335
-      target_compile_options(test_opt PRIVATE /bigobj)
-    endif()
+    # MSVC builds (e.g., VS 2017, VS 2022) require /bigobj on test_opt to avoid
+    # exceeding the object file section limit.
+    # https://github.com/KhronosGroup/SPIRV-Tools/issues/5335
+    target_compile_options(test_opt PRIVATE /bigobj)
   endif()
 endif()
