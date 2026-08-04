@@ -1140,7 +1140,7 @@ TEST_F(ValidateSpvEXTDescriptorHeap, BufferPointerEXTStorageClass) {
   const std::string diag = getDiagnosticString();
   EXPECT_THAT(
       diag,
-      HasSubstr("OpBufferPointerEXT's Result Type must be a pointer "
+      HasSubstr("OpBufferPointerEXT Result Type must be a pointer "
                 "type with a Storage Class of Uniform or StorageBuffer."));
 }
 
@@ -1195,10 +1195,9 @@ TEST_F(ValidateSpvEXTDescriptorHeap, BufferPointerEXTLayout) {
   CompileSuccessfully(str.c_str(), SPV_ENV_VULKAN_1_3);
   EXPECT_NE(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_3));
   const std::string diag = getDiagnosticString();
-  EXPECT_THAT(diag, AnyVUID("VUID-StandaloneSpirv-Result-11346"));
-  EXPECT_THAT(
-      diag, HasSubstr("The result type operand of OpBufferPointerEXT "
-                      "must have a Type operand that is explicitly laid out"));
+  EXPECT_THAT(diag,
+              HasSubstr("OpBufferPointerEXT Result Type must be a pointer type "
+                        "with a Storage Class of Uniform or StorageBuffer."));
 }
 
 TEST_F(ValidateSpvEXTDescriptorHeap, BufferPointerEXTDecorate) {
@@ -1558,6 +1557,33 @@ TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideNonDescriptor) {
   EXPECT_THAT(diag,
               HasSubstr("ArrayStrideIdEXT decoration must only be applied to "
                         "array type containing a Descriptor type."));
+}
+
+TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideStructContainingDescriptor) {
+  const std::string str = R"(
+              OpCapability Shader
+              OpCapability DescriptorHeapEXT
+              OpExtension "SPV_EXT_descriptor_heap"
+              OpMemoryModel Logical GLSL450
+              OpEntryPoint GLCompute %main "main"
+              OpExecutionMode %main LocalSize 1 1 1
+              OpDecorateId %_runtimearr_Material ArrayStrideIdEXT %uint_16
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+   %uint_16 = OpConstant %uint 16
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+     %buffer = OpTypeBufferEXT StorageBuffer
+   %Material = OpTypeStruct %v4float %buffer
+%_runtimearr_Material = OpTypeRuntimeArray %Material
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+              OpReturn
+              OpFunctionEnd
+  )";
+  CompileSuccessfully(str.c_str(), SPV_ENV_VULKAN_1_3);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_3));
 }
 
 TEST_F(ValidateSpvEXTDescriptorHeap, MemberDecorateIdArrayStrideIdEXT) {
@@ -2360,6 +2386,102 @@ TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideFloat) {
       getDiagnosticString(),
       HasSubstr(
           "ArrayStrideIdEXT extra operand must be a 32-bit int scalar type"));
+}
+
+TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideConstantZero) {
+  const std::string str = R"(
+      OpCapability Shader
+      OpCapability DescriptorHeapEXT
+      OpExtension "SPV_EXT_descriptor_heap"
+      OpMemoryModel Logical GLSL450
+      OpEntryPoint GLCompute %main "main"
+      OpExecutionMode %main LocalSize 1 1 1
+      OpDecorateId %array ArrayStrideIdEXT %int_0
+%int = OpTypeInt 32 0
+%int_0 = OpConstant %int 0
+%int_2 = OpConstant %int 2
+%sampler = OpTypeSampler
+%array = OpTypeArray %sampler %int_2
+%void = OpTypeVoid
+  %3 = OpTypeFunction %void
+%main = OpFunction %void None %3
+  %5 = OpLabel
+      OpReturn
+      OpFunctionEnd
+
+  )";
+  CompileSuccessfully(str.c_str(), SPV_ENV_VULKAN_1_4);
+  EXPECT_NE(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_4));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("ArrayStrideIdEXT contains a stride of zero"));
+}
+
+TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideSpecConstantZero) {
+  const std::string str = R"(
+      OpCapability Shader
+      OpCapability DescriptorHeapEXT
+      OpExtension "SPV_EXT_descriptor_heap"
+      OpMemoryModel Logical GLSL450
+      OpEntryPoint GLCompute %main "main"
+      OpExecutionMode %main LocalSize 1 1 1
+      OpDecorate %spec SpecId 1
+      OpDecorateId %array ArrayStrideIdEXT %spec
+%int = OpTypeInt 32 0
+%int_2 = OpConstant %int 2
+%spec = OpSpecConstant %int 0
+%sampler = OpTypeSampler
+%array = OpTypeArray %sampler %int_2
+%void = OpTypeVoid
+  %3 = OpTypeFunction %void
+%main = OpFunction %void None %3
+  %5 = OpLabel
+      OpReturn
+      OpFunctionEnd
+
+  )";
+  CompileSuccessfully(str.c_str(), SPV_ENV_VULKAN_1_4);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions(SPV_ENV_VULKAN_1_4));
+}
+
+// https://github.com/KhronosGroup/SPIRV-Tools/issues/6696
+TEST_F(ValidateSpvEXTDescriptorHeap, OffsetIdOnArray) {
+  const std::string str = R"(
+               OpCapability Shader
+               OpCapability UntypedPointersKHR
+               OpCapability DescriptorHeapEXT
+               OpCapability Sampled1D
+               OpExtension "SPV_KHR_untyped_pointers"
+               OpExtension "SPV_EXT_descriptor_heap"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %2
+               OpExecutionMode %1 LocalSize 1 1 1
+               OpDecorate %2 BuiltIn ResourceHeapEXT
+               OpDecorateId %7 OffsetIdEXT %4
+         %11 = OpTypeVoid
+         %12 = OpTypeFunction %11
+         %13 = OpTypeInt 32 0
+         %16 = OpConstant %13 0
+          %4 = OpConstant %13 0
+         %20 = OpTypeImage %13 1D 0 0 0 1 Unknown
+         %21 = OpTypeBufferEXT StorageBuffer
+         %22 = OpTypeSampler
+         %23 = OpTypeSampledImage %20
+          %7 = OpTypeRuntimeArray %20
+         %24 = OpTypeUntypedPointerKHR UniformConstant
+         %25 = OpTypeUntypedPointerKHR StorageBuffer
+          %2 = OpUntypedVariableKHR %24 UniformConstant
+          %1 = OpFunction %11 None %12
+         %26 = OpLabel
+         %27 = OpUntypedAccessChainKHR %24 %7 %2 %16
+         %28 = OpLoad %20 %27
+               OpReturn
+               OpFunctionEnd
+  )";
+  CompileSuccessfully(str.c_str(), SPV_ENV_VULKAN_1_4);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_4));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("OffsetIdEXT can only be applied to structure members"));
 }
 
 }  // namespace
