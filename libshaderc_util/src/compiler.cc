@@ -34,6 +34,10 @@
 namespace {
 using shaderc_util::string_piece;
 
+constexpr const char* kLineDirectivePrefixCstr = "#line ";
+constexpr string_piece kLineDirectivePrefix(kLineDirectivePrefixCstr,
+                                            kLineDirectivePrefixCstr + 6);
+
 // For use with glslang parsing calls.
 const bool kNotForwardCompatible = false;
 
@@ -45,7 +49,8 @@ inline bool LineDirectiveIsForNextLine(int version, EProfile profile) {
 
 // Returns a #line directive whose arguments are line and filename.
 inline std::string GetLineDirective(int line, const string_piece& filename) {
-  return "#line " + std::to_string(line) + " \"" + filename.str() + "\"\n";
+  return kLineDirectivePrefix.str() + std::to_string(line) + " \"" +
+         filename.str() + "\"\n";
 }
 
 // Given a canonicalized #line directive (starting exactly with "#line", using
@@ -55,9 +60,8 @@ inline std::string GetLineDirective(int line, const string_piece& filename) {
 // empty string_piece. Behavior is undefined if the directive parameter is not a
 // canonicalized #line directive.
 std::pair<int, string_piece> DecodeLineDirective(string_piece directive) {
-  const string_piece kLineDirective = "#line ";
-  assert(directive.starts_with(kLineDirective));
-  directive = directive.substr(kLineDirective.size());
+  assert(directive.starts_with(kLineDirectivePrefix));
+  directive = directive.substr(kLineDirectivePrefix.size());
 
   const int line = std::atoi(directive.data());
   const size_t space_loc = directive.find_first_of(' ');
@@ -202,6 +206,19 @@ std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Compile(
     return result_tuple;
   }
 
+#if !SHADERC_ENABLE_HLSL
+  if (source_language_ == SourceLanguage::HLSL) {
+    std::string err =
+        "Shaderc was built without HLSL support. See "
+        "https://github.com/KhronosGroup/glslang/issues/4210";
+    *error_stream << err << '\n';
+    succeeded = false;
+    compilation_output_data = ConvertStringToVector(err);
+    compilation_output_data_size_in_bytes = err.size();
+    return result_tuple;
+  }
+#endif
+
   EShLanguage used_shader_stage = forced_shader_stage;
   const std::string macro_definitions =
       shaderc_util::format(predefined_macros_, "#define ", " ", "\n");
@@ -286,16 +303,20 @@ std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Compile(
       bases[static_cast<int>(UniformKind::StorageBuffer)]);
   shader.setShiftUavBinding(
       bases[static_cast<int>(UniformKind::UnorderedAccessView)]);
+#if SHADERC_ENABLE_HLSL
   shader.setHlslIoMapping(hlsl_iomap_);
+#endif
   shader.setResourceSetBinding(
       hlsl_explicit_bindings_[static_cast<int>(used_shader_stage)]);
   shader.setEnvClient(target_client_info.client,
                       target_client_info.client_version);
   shader.setEnvTarget(target_client_info.target_language,
                       target_client_info.target_language_version);
+#if SHADERC_ENABLE_HLSL
   if (hlsl_functionality1_enabled_) {
     shader.setEnvTargetHlslFunctionality1();
   }
+#endif
   if (vulkan_rules_relaxed_) {
     glslang::EShSource language = glslang::EShSourceNone;
     switch (source_language_) {
@@ -587,9 +608,11 @@ std::tuple<bool, std::string, std::string> Compiler::PreprocessShader(
   }
   shader.setEnvClient(target_client_info.client,
                       target_client_info.client_version);
+#if SHADERC_ENABLE_HLSL
   if (hlsl_functionality1_enabled_) {
     shader.setEnvTargetHlslFunctionality1();
   }
+#endif
   shader.setInvertY(invert_y_enabled_);
   shader.setNanMinMaxClamp(nan_clamp_);
 
@@ -682,7 +705,6 @@ std::string Compiler::CleanupPreamble(const string_piece& preprocessed_shader,
 std::pair<EShLanguage, std::string> Compiler::GetShaderStageFromSourceCode(
     string_piece filename, const std::string& preprocessed_shader) const {
   const string_piece kPragmaShaderStageDirective = "#pragma shader_stage";
-  const string_piece kLineDirective = "#line";
 
   int version;
   EProfile profile;
@@ -711,7 +733,7 @@ std::pair<EShLanguage, std::string> Compiler::GetShaderStageFromSourceCode(
     }
 
     // Update logical line number for the next line.
-    if (current_line.starts_with(kLineDirective)) {
+    if (current_line.starts_with(kLineDirectivePrefix)) {
       string_piece name;
       std::tie(logical_line_no, name) = DecodeLineDirective(current_line);
       if (!name.empty()) filename = name;
