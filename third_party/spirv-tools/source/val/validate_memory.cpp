@@ -247,6 +247,8 @@ int MemoryAccessNumWords(uint32_t mask) {
   if (mask & uint32_t(spv::MemoryAccessMask::Aligned)) ++result;
   if (mask & uint32_t(spv::MemoryAccessMask::MakePointerAvailableKHR)) ++result;
   if (mask & uint32_t(spv::MemoryAccessMask::MakePointerVisibleKHR)) ++result;
+  if (mask & uint32_t(spv::MemoryAccessMask::AliasScopeINTELMask)) ++result;
+  if (mask & uint32_t(spv::MemoryAccessMask::NoAliasINTELMask)) ++result;
   return result;
 }
 
@@ -1187,6 +1189,7 @@ spv_result_t ValidateVariableTileImageEXT(ValidationState_t& _,
 
   if (!is_valid_decl) {
     return _.diag(SPV_ERROR_INVALID_DATA, inst)
+           << _.VkErrorID(8724)
            << "The TileImageEXT Storage Class must only be used for declaring "
               "tile image variables";
   } else {
@@ -2518,6 +2521,41 @@ spv_result_t ValidateCooperativeMatrixLength(ValidationState_t& state,
   return SPV_SUCCESS;
 }
 
+spv_result_t ValidateCooperativeMatrixGetCoordinateEXT(
+    ValidationState_t& state, const Instruction* inst) {
+  std::string instr_name = "OpCooperativeMatrixGetCoordinateEXT";
+
+  // Result type must be a uvec2
+  if (!state.IsIntVectorType(inst->type_id(), 32, 2)) {
+    return state.diag(SPV_ERROR_INVALID_ID, inst)
+           << instr_name << " Result Type <id> "
+           << state.getIdName(inst->type_id())
+           << " must be OpTypeVector with two 32-bit integer components.";
+  }
+
+  // Matrix operand must be a cooperative matrix
+  auto matrix_type_id =
+      state.FindDef(inst->GetOperandAs<uint32_t>(2))->type_id();
+  if (!state.IsCooperativeMatrixKHRType(matrix_type_id)) {
+    return state.diag(SPV_ERROR_INVALID_ID, inst)
+           << instr_name << " Matrix <id> "
+           << state.getIdName(inst->GetOperandAs<uint32_t>(2))
+           << " must be OpTypeCooperativeMatrixKHR.";
+  }
+
+  // Index operand must be a 32-bit int.
+  auto index_type_id =
+      state.FindDef(inst->GetOperandAs<uint32_t>(3))->type_id();
+  if (!state.IsIntScalarType(index_type_id, 32)) {
+    return state.diag(SPV_ERROR_INVALID_ID, inst)
+           << instr_name << " Index <id> "
+           << state.getIdName(inst->GetOperandAs<uint32_t>(3))
+           << " must be OpTypeInt with width 32.";
+  }
+
+  return SPV_SUCCESS;
+}
+
 spv_result_t ValidateCooperativeMatrixLoadStoreNV(ValidationState_t& _,
                                                   const Instruction* inst) {
   uint32_t type_id;
@@ -2822,21 +2860,29 @@ spv_result_t ValidateCooperativeMatrixLoadStoreKHR(ValidationState_t& _,
 
 spv_result_t ValidateBufferPointerEXT(ValidationState_t& _,
                                       const Instruction* inst) {
-  const auto storage_class_ptr = _.FindDef(inst->GetOperandAs<uint32_t>(0));
+  const auto storage_class_ptr = _.FindDef(inst->type_id());
   if (storage_class_ptr->opcode() != spv::Op::OpTypeUntypedPointerKHR &&
       storage_class_ptr->opcode() != spv::Op::OpTypePointer) {
     return _.diag(SPV_ERROR_INVALID_ID, inst)
            << "OpBufferPointerEXT's Result Type should be "
            << "a pointer type.";
-  } else {
-    // Buffer operand
-    auto buffer =
-        _.FindUntypedBaseVariable(_.FindDef(inst->GetOperandAs<uint32_t>(2)));
-    if (!buffer || !_.IsBuiltin(buffer->id(), spv::BuiltIn::ResourceHeapEXT)) {
-      return _.diag(SPV_ERROR_INVALID_ID, inst)
-             << "OpBufferPointerEXT's buffer must be an untyped pointer"
-             << " into a variable declared with the ResourceHeapEXT built-in";
-    }
+  }
+
+  auto sc = storage_class_ptr->GetOperandAs<spv::StorageClass>(1u);
+  if (sc != spv::StorageClass::StorageBuffer &&
+      sc != spv::StorageClass::Uniform) {
+    return _.diag(SPV_ERROR_INVALID_ID, inst)
+           << "OpBufferPointerEXT Result Type must be a pointer type "
+           << "with a Storage Class of Uniform or StorageBuffer.";
+  }
+
+  // Buffer operand
+  auto buffer =
+      _.FindUntypedBaseVariable(_.FindDef(inst->GetOperandAs<uint32_t>(2)));
+  if (!buffer || !_.IsBuiltin(buffer->id(), spv::BuiltIn::ResourceHeapEXT)) {
+    return _.diag(SPV_ERROR_INVALID_ID, inst)
+           << "OpBufferPointerEXT's buffer must be an untyped pointer"
+           << " into a variable declared with the ResourceHeapEXT built-in";
   }
   return SPV_SUCCESS;
 }
@@ -3822,6 +3868,8 @@ spv_result_t MemoryPass(ValidationState_t& _, const Instruction* inst) {
       return ValidateCooperativeMatrixLength(_, inst, true);
     case spv::Op::OpCooperativeMatrixLengthNV:
       return ValidateCooperativeMatrixLength(_, inst, false);
+    case spv::Op::OpCooperativeMatrixGetCoordinateEXT:
+      return ValidateCooperativeMatrixGetCoordinateEXT(_, inst);
     case spv::Op::OpCooperativeMatrixLoadKHR:
     case spv::Op::OpCooperativeMatrixStoreKHR:
       return ValidateCooperativeMatrixLoadStoreKHR(_, inst);

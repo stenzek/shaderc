@@ -580,10 +580,10 @@ std::function<bool(unsigned)> spvOperandCanBeForwardDeclaredFunction(
     case spv::Op::OpTypeArray:
       out = [](unsigned index) { return index == 1; };
       break;
-    case spv::Op::OpCooperativeMatrixPerElementOpNV:
+    case spv::Op::OpCooperativeMatrixPerElementOpEXT:
       out = [](unsigned index) { return index == 3; };
       break;
-    case spv::Op::OpCooperativeMatrixReduceNV:
+    case spv::Op::OpCooperativeMatrixReduceEXT:
       out = [](unsigned index) { return index == 4; };
       break;
     case spv::Op::OpCooperativeMatrixLoadTensorNV:
@@ -592,6 +592,10 @@ std::function<bool(unsigned)> spvOperandCanBeForwardDeclaredFunction(
       break;
     case spv::Op::OpGraphEntryPointARM:
       out = [](unsigned index) { return index == 0; };
+      break;
+    case spv::Op::OpExtInstWithForwardRefsKHR:
+      // Any operand may be a forward reference.
+      out = [](unsigned) { return true; };
       break;
     default:
       out = [](unsigned) { return false; };

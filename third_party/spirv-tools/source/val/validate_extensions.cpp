@@ -26,6 +26,7 @@
 #include "source/latest_version_glsl_std_450_header.h"
 #include "source/latest_version_opencl_std_header.h"
 #include "source/opcode.h"
+#include "source/operand.h"
 #include "source/spirv_constant.h"
 #include "source/table2.h"
 #include "source/val/instruction.h"
@@ -34,6 +35,7 @@
 #include "spirv-tools/libspirv.h"
 #include "spirv/unified1/ArmExperimentalMLOperations.h"
 #include "spirv/unified1/NonSemanticClspvReflection.h"
+#include "spirv/unified1/NonSemanticDebugPrintf.h"
 #include "spirv/unified1/NonSemanticGraphDebugInfo.h"
 #include "spirv/unified1/NonSemanticShaderDebugInfo.h"
 
@@ -161,6 +163,38 @@ std::string GetExtInstName(const ValidationState_t& _,
   ss << desc->name().data();
 
   return ss.str();
+}
+
+// Rejects an instruction whose result or any operand uses a BFloat16 or FP8
+// (E4M3/E5M2) type, i.e. an OpTypeFloat that is not IEEE 754 encoded.
+spv_result_t ValidateExtInstFloatEncoding(ValidationState_t& _,
+                                          const Instruction* inst) {
+  auto check = [&](uint32_t type_id) -> spv_result_t {
+    if (_.IsBfloat16Type(type_id)) {
+      return _.diag(SPV_ERROR_INVALID_DATA, inst)
+             << GetExtInstName(_, inst) << ": doesn't support BFloat16 type.";
+    }
+    if (_.IsFP8Type(type_id)) {
+      return _.diag(SPV_ERROR_INVALID_DATA, inst)
+             << GetExtInstName(_, inst)
+             << ": doesn't support FP8 E4M3/E5M2 types.";
+    }
+    return SPV_SUCCESS;
+  };
+
+  if (spv_result_t result = check(inst->type_id())) return result;
+
+  const uint32_t num_operands = static_cast<uint32_t>(inst->operands().size());
+  for (uint32_t operand_index = 4; operand_index < num_operands;
+       ++operand_index) {
+    // Some ext instructions take literal operands (e.g. OpenCL.std vloadn's
+    // component count); only <id> operands have a meaningful result type.
+    if (!spvIsIdType(inst->operand(operand_index).type)) continue;
+    if (spv_result_t result = check(_.GetOperandTypeId(inst, operand_index)))
+      return result;
+  }
+
+  return SPV_SUCCESS;
 }
 
 // Returns the declared NSDI version from the OpExtInstImport referenced by
@@ -4416,9 +4450,37 @@ spv_result_t ValidateExtInstNonsemanticClspvReflection(
   return ValidateClspvReflectionInstruction(_, inst, version);
 }
 
+spv_result_t ValidateExtInstNonSemanticDebugPrintf(ValidationState_t& _,
+                                                   const Instruction* inst) {
+  if (!_.IsVoidType(inst->type_id())) {
+    return _.diag(SPV_ERROR_INVALID_DATA, inst)
+           << "DebugPrintf: "
+           << "expected result type must be a result id of OpTypeVoid";
+  }
+
+  if (inst->word(4) == NonSemanticDebugPrintfDebugPrintf) {
+    const auto* format = _.FindDef(inst->word(5));
+    if (!format || format->opcode() != spv::Op::OpString) {
+      return _.diag(SPV_ERROR_INVALID_DATA, inst)
+             << "DebugPrintf: "
+             << "expected operand Format must be a result id of OpString";
+    }
+  }
+
+  return SPV_SUCCESS;
+}
+
 spv_result_t ValidateExtInst(ValidationState_t& _, const Instruction* inst) {
   const spv_ext_inst_type_t ext_inst_type =
       spv_ext_inst_type_t(inst->ext_inst_type());
+
+  // GLSL.std.450 and OpenCL.std define a floating-point type as an OpTypeFloat
+  // using the IEEE 754 encoding, so they don't support BFloat16 or FP8 types.
+  if (ext_inst_type == SPV_EXT_INST_TYPE_GLSL_STD_450 ||
+      ext_inst_type == SPV_EXT_INST_TYPE_OPENCL_STD) {
+    if (spv_result_t result = ValidateExtInstFloatEncoding(_, inst))
+      return result;
+  }
 
   if (ext_inst_type == SPV_EXT_INST_TYPE_GLSL_STD_450) {
     return ValidateExtInstGlslStd450(_, inst);
@@ -4432,6 +4494,8 @@ spv_result_t ValidateExtInst(ValidationState_t& _, const Instruction* inst) {
     return ValidateExtInstNonsemanticClspvReflection(_, inst);
   } else if (ext_inst_type == SPV_EXT_INST_TYPE_NONSEMANTIC_GRAPH_DEBUGINFO) {
     return ValidateExtInstGraphDebugInfo(_, inst);
+  } else if (ext_inst_type == SPV_EXT_INST_TYPE_NONSEMANTIC_DEBUGPRINTF) {
+    return ValidateExtInstNonSemanticDebugPrintf(_, inst);
   }
 
   return SPV_SUCCESS;
