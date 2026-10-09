@@ -168,9 +168,8 @@ class CompileOptions {
   }
 
   // Sets the compiler mode to generate debug information in the output.
-  void SetGenerateDebugInfo(bool enabled, bool non_semantic_debug_info) {
-    shaderc_compile_options_set_generate_debug_info(options_, enabled,
-      non_sematic_debug_info);
+  void SetGenerateDebugInfo() {
+    shaderc_compile_options_set_generate_debug_info(options_);
   }
 
   // Sets the compiler optimization level to the given level. Only the last one

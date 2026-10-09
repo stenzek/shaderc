@@ -422,12 +422,8 @@ void shaderc_compile_options_set_source_language(
 }
 
 void shaderc_compile_options_set_generate_debug_info(
-    shaderc_compile_options_t options, bool enabled, bool enable_non_semantic) {
-  if (enabled) {
-    options->compiler.SetGenerateDebugInfo();
-    if (enable_non_semantic)
-      options->compiler.SetEmitNonSemanticDebugInfo();
-  }
+    shaderc_compile_options_t options) {
+  options->compiler.SetGenerateDebugInfo();
 }
 
 void shaderc_compile_options_set_optimization_level(
