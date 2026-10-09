@@ -426,6 +426,16 @@ void shaderc_compile_options_set_generate_debug_info(
   options->compiler.SetGenerateDebugInfo();
 }
 
+void shaderc_compile_options_set_generate_nonsemantic_debug_info(
+    shaderc_compile_options_t options) {
+  options->compiler.SetGenerateNonSemanticDebugInfo();
+}
+
+void shaderc_compile_options_set_generate_nonsemantic_debug_source(
+    shaderc_compile_options_t options) {
+  options->compiler.SetGenerateNonSemanticDebugSource();
+}
+
 void shaderc_compile_options_set_optimization_level(
     shaderc_compile_options_t options, shaderc_optimization_level level) {
   auto opt_level = shaderc_util::Compiler::OptimizationLevel::Zero;
@@ -774,21 +784,25 @@ shaderc_compilation_result_t shaderc_assemble_into_spv(
 }
 
 size_t shaderc_result_get_length(const shaderc_compilation_result_t result) {
+  if (!result) return 0;
   return result->output_data_size;
 }
 
 size_t shaderc_result_get_num_warnings(
     const shaderc_compilation_result_t result) {
+  if (!result) return 0;
   return result->num_warnings;
 }
 
 size_t shaderc_result_get_num_errors(
     const shaderc_compilation_result_t result) {
+  if (!result) return 0;
   return result->num_errors;
 }
 
 const char* shaderc_result_get_bytes(
     const shaderc_compilation_result_t result) {
+  if (!result) return nullptr;
   return result->GetBytes();
 }
 
@@ -798,11 +812,13 @@ void shaderc_result_release(shaderc_compilation_result_t result) {
 
 const char* shaderc_result_get_error_message(
     const shaderc_compilation_result_t result) {
+  if (!result) return nullptr;
   return result->messages.c_str();
 }
 
 shaderc_compilation_status shaderc_result_get_compilation_status(
     const shaderc_compilation_result_t result) {
+  if (!result) return shaderc_compilation_status_null_result_object;
   return result->compilation_status;
 }
 

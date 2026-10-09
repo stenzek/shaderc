@@ -130,8 +130,14 @@ Options:
   -fshader-stage=<stage>
                     Treat subsequent input files as having stage <stage>.
                     Valid stages are vertex, vert, fragment, frag, tesscontrol,
-                    tesc, tesseval, tese, geometry, geom, compute, and comp.
+                    tesc, tesseval, tese, geometry, geom, compute, comp, raygen,
+                    rgen, anyhit, rahit, closest, rchit, miss, rmiss, intersect,
+                    rint, callable, rcall, task, and mesh.
   -g                Generate source-level debug information.
+  -gV               Generate non-semantic debug information
+                    (NonSemantic.Shader.DebugInfo.100).
+  -gVS              Generate non-semantic debug information with embedded
+                    source. Implies -gV.
   -h                Display available options.
   --help            Display available options.
   -I <value>        Add directory to include search path.
@@ -643,6 +649,10 @@ int main(int argc, char** argv) {
       }
     } else if (arg == "-g") {
       compiler.options().SetGenerateDebugInfo();
+    } else if (arg == "-gV") {
+      compiler.options().SetGenerateNonSemanticDebugInfo();
+    } else if (arg == "-gVS") {
+      compiler.options().SetGenerateNonSemanticDebugSource();
     } else if (arg.starts_with("-O")) {
       if (arg == "-O") {
         compiler.options().SetOptimizationLevel(

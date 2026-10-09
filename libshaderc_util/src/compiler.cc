@@ -14,6 +14,7 @@
 
 #include "libshaderc_util/compiler.h"
 
+#include <climits>
 #include <cstdint>
 #include <iomanip>
 #include <sstream>
@@ -195,6 +196,16 @@ std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Compile(
   std::vector<uint32_t>& compilation_output_data = std::get<1>(result_tuple);
   size_t& compilation_output_data_size_in_bytes = std::get<2>(result_tuple);
 
+  // glslang takes source lengths as int; a size_t that does not fit would be
+  // truncated (negative -> glslang falls back to strlen() on a buffer that is
+  // not required to be NUL-terminated). Reject oversized inputs up front.
+  if (input_source_string.size() > static_cast<size_t>(INT_MAX)) {
+    *error_stream << error_tag
+                  << ": error: shader source exceeds INT_MAX bytes\n";
+    *total_errors = 1;
+    return result_tuple;
+  }
+
   // Check target environment.
   const auto target_client_info = GetGlslangClientInfo(
       error_tag, target_env_, target_env_version_, target_spirv_version_,
@@ -363,6 +374,8 @@ std::tuple<bool, std::vector<uint32_t>, size_t> Compiler::Compile(
   std::vector<uint32_t>& spirv = compilation_output_data;
   glslang::SpvOptions options;
   options.generateDebugInfo = generate_debug_info_;
+  options.emitNonSemanticShaderDebugInfo = generate_nonsemantic_debug_info_;
+  options.emitNonSemanticShaderDebugSource = generate_nonsemantic_debug_source_;
   options.disableOptimizer = true;
   options.optimizeSize = false;
   // Note the call to GlslangToSpv also populates compilation_output_data.
@@ -527,13 +540,28 @@ void Compiler::SetForcedVersionProfile(int version, EProfile profile) {
 
 void Compiler::SetWarningsAsErrors() { warnings_as_errors_ = true; }
 
-void Compiler::SetGenerateDebugInfo() {
-  generate_debug_info_ = true;
-  for (size_t i = 0; i < enabled_opt_passes_.size(); ++i) {
-    if (enabled_opt_passes_[i] == PassId::kStripDebugInfo) {
-      enabled_opt_passes_[i] = PassId::kNullPass;
+void Compiler::RemoveStripDebugInfoPass() {
+  for (auto& pass : enabled_opt_passes_) {
+    if (pass == PassId::kStripDebugInfo) {
+      pass = PassId::kNullPass;
     }
   }
+}
+
+void Compiler::SetGenerateDebugInfo() {
+  generate_debug_info_ = true;
+  RemoveStripDebugInfoPass();
+}
+
+void Compiler::SetGenerateNonSemanticDebugInfo() {
+  generate_nonsemantic_debug_info_ = true;
+  RemoveStripDebugInfoPass();
+}
+
+void Compiler::SetGenerateNonSemanticDebugSource() {
+  generate_nonsemantic_debug_info_ = true;
+  generate_nonsemantic_debug_source_ = true;
+  RemoveStripDebugInfoPass();
 }
 
 void Compiler::SetOptimizationLevel(Compiler::OptimizationLevel level) {
@@ -542,13 +570,13 @@ void Compiler::SetOptimizationLevel(Compiler::OptimizationLevel level) {
 
   switch (level) {
     case OptimizationLevel::Size:
-      if (!generate_debug_info_) {
+      if (!generate_debug_info_ && !generate_nonsemantic_debug_info_) {
         enabled_opt_passes_.push_back(PassId::kStripDebugInfo);
       }
       enabled_opt_passes_.push_back(PassId::kSizePasses);
       break;
     case OptimizationLevel::Performance:
-      if (!generate_debug_info_) {
+      if (!generate_debug_info_ && !generate_nonsemantic_debug_info_) {
         enabled_opt_passes_.push_back(PassId::kStripDebugInfo);
       }
       enabled_opt_passes_.push_back(PassId::kPerformancePasses);
@@ -759,19 +787,29 @@ std::pair<EShLanguage, std::string> Compiler::GetShaderStageFromSourceCode(
         first_pragma_stage.str() + "'\n";
   }
 
+  constexpr size_t kMaxReportedConflicts = 3;
+  size_t num_conflicts = 0;
   for (size_t i = 1; i < stages.size(); ++i) {
     const string_piece& current_stage = std::get<2>(stages[i]);
     if (current_stage != first_pragma_stage) {
-      const string_piece& current_filename = std::get<0>(stages[i]);
-      const std::string current_line = std::to_string(std::get<1>(stages[i]));
-      error_message += current_filename.str() + ":" + current_line +
-                       ": error: '#pragma': conflicting stages for "
-                       "'shader_stage' #pragma: '" +
-                       current_stage.str() + "' (was '" +
-                       first_pragma_stage.str() + "' at " +
-                       first_pragma_filename.str() + ":" + first_pragma_line +
-                       ")\n";
+      ++num_conflicts;
+      if (num_conflicts <= kMaxReportedConflicts) {
+        const string_piece& current_filename = std::get<0>(stages[i]);
+        const std::string current_line = std::to_string(std::get<1>(stages[i]));
+        error_message += current_filename.str() + ":" + current_line +
+                         ": error: '#pragma': conflicting stages for "
+                         "'shader_stage' #pragma: '" +
+                         current_stage.str() + "' (was '" +
+                         first_pragma_stage.str() + "' at " +
+                         first_pragma_filename.str() + ":" + first_pragma_line +
+                         ")\n";
+      }
     }
+  }
+  if (num_conflicts > kMaxReportedConflicts) {
+    error_message += "error: ... " +
+                     std::to_string(num_conflicts - kMaxReportedConflicts) +
+                     " more conflicting 'shader_stage' pragmas\n";
   }
 
   return std::make_pair(error_message.empty() ? stage : EShLangCount,
