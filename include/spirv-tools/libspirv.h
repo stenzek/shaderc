@@ -370,6 +370,7 @@ typedef enum spv_ext_inst_type_t {
   SPV_EXT_INST_TYPE_TOSA_001000_1,
   SPV_EXT_INST_TYPE_ARM_MOTION_ENGINE_100,
   SPV_EXT_INST_TYPE_ARM_EXPERIMENTAL_ML_OPERATIONS,
+  SPV_EXT_INST_TYPE_NONSEMANTIC_DEBUGPRINTF,
 
   // Multiple distinct extended instruction set types could return this
   // value, if they are prefixed with NonSemantic. and are otherwise
@@ -788,6 +789,24 @@ SPIRV_TOOLS_EXPORT void spvValidatorOptionsSetAllowVulkan32BitBitwise(
 SPIRV_TOOLS_EXPORT void spvValidatorOptionsSetFriendlyNames(
     spv_validator_options options, bool val);
 
+// Sets custom size and alignment for buffer and acceleration structure
+// descriptor heap resources.
+SPIRV_TOOLS_EXPORT void spvValidatorOptionsSetBufferDescriptorLayout(
+    spv_validator_options options, uint32_t size, uint32_t alignment);
+
+// Sets custom size and alignment for image and sampled image descriptor heap
+// resources.
+SPIRV_TOOLS_EXPORT void spvValidatorOptionsSetImageDescriptorLayout(
+    spv_validator_options options, uint32_t size, uint32_t alignment);
+
+// Sets custom size and alignment for sampler descriptor heap resources.
+SPIRV_TOOLS_EXPORT void spvValidatorOptionsSetSamplerDescriptorLayout(
+    spv_validator_options options, uint32_t size, uint32_t alignment);
+
+// Sets custom size and alignment for tensor descriptor heap resources.
+SPIRV_TOOLS_EXPORT void spvValidatorOptionsSetTensorDescriptorLayout(
+    spv_validator_options options, uint32_t size, uint32_t alignment);
+
 // Creates an optimizer options object with default options. Returns a valid
 // options object. The object remains valid until it is passed into
 // |spvOptimizerOptionsDestroy|.
@@ -1017,8 +1036,8 @@ SPIRV_TOOLS_EXPORT spv_result_t spvBinaryParse(
 // The optimizer interface.
 
 // A pointer to a function that accepts a log message from an optimizer.
-typedef void (*spv_message_consumer)(
-    spv_message_level_t, const char*, const spv_position_t*, const char*);
+typedef void (*spv_message_consumer)(spv_message_level_t, const char*,
+                                     const spv_position_t*, const char*);
 
 // Creates and returns an optimizer object.  This object must be passed to
 // optimizer APIs below and is valid until passed to spvOptimizerDestroy.

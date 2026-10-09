@@ -1228,8 +1228,9 @@ TEST_F(ValidateSpvEXTDescriptorHeap, BufferPointerEXTDecorate) {
        %uint = OpTypeInt 32 0
 %_ptr_Output_uint = OpTypePointer Output %uint
           %o = OpVariable %_ptr_Output_uint Output
-%_ptr_Uniform = OpTypeUntypedPointerKHR UniformConstant
-%resource_heap = OpUntypedVariableKHR %_ptr_Uniform UniformConstant
+%_ptr_Uniform = OpTypeUntypedPointerKHR Uniform
+%_ptr_UniformConstant = OpTypeUntypedPointerKHR UniformConstant
+%resource_heap = OpUntypedVariableKHR %_ptr_UniformConstant UniformConstant
         %int = OpTypeInt 32 1
       %int_9 = OpConstant %int 9
           %U = OpTypeStruct %uint
@@ -1239,7 +1240,7 @@ TEST_F(ValidateSpvEXTDescriptorHeap, BufferPointerEXTDecorate) {
 %_runtimearr_17 = OpTypeRuntimeArray %17
        %main = OpFunction %void None %3
           %5 = OpLabel
-         %16 = OpUntypedAccessChainKHR %_ptr_Uniform %_runtimearr_17 %resource_heap %int_9
+         %16 = OpUntypedAccessChainKHR %_ptr_UniformConstant %_runtimearr_17 %resource_heap %int_9
          %20 = OpBufferPointerEXT %_ptr_Uniform %16
          %21 = OpUntypedAccessChainKHR %_ptr_Uniform %U %20 %int_0
          %22 = OpLoad %uint %21
@@ -1819,15 +1820,15 @@ TEST_F(ValidateSpvEXTDescriptorHeap, OffsetIdStructOfStructOfImage) {
                OpExecutionMode %1 LocalSize 1 1 1
                OpDecorate %2 BuiltIn ResourceHeapEXT
                OpMemberDecorate %struct 0 Offset 0
-               OpMemberDecorateIdEXT %struct 1 OffsetIdEXT %uint_0
+               OpMemberDecorateIdEXT %struct 1 OffsetIdEXT %uint_4
                OpMemberDecorate %image_struct 0 Offset 0
        %void = OpTypeVoid
           %7 = OpTypeFunction %void
        %uint = OpTypeInt 32 0
      %uint_0 = OpConstant %uint 0
      %uint_1 = OpConstant %uint 1
+     %uint_4 = OpConstant %uint 4
  %uint_51966 = OpConstant %uint 51966
-   %uint_0_0 = OpConstant %uint 0
 %_ptr_UniformConstant = OpTypeUntypedPointerKHR UniformConstant
           %2 = OpUntypedVariableKHR %_ptr_UniformConstant UniformConstant
          %14 = OpTypeImage %uint Buffer 0 0 0 2 R32ui
@@ -2355,6 +2356,58 @@ TEST_F(ValidateSpvEXTDescriptorHeap, OffsetIdNonConstant) {
   EXPECT_THAT(
       getDiagnosticString(),
       HasSubstr("OffsetIdEXT extra operand must be a 32-bit int scalar type"));
+}
+
+// https://github.com/KhronosGroup/SPIRV-Tools/issues/6739
+TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideOverlap) {
+  const std::string str = R"(
+               OpCapability Shader
+               OpCapability UntypedPointersKHR
+               OpCapability DescriptorHeapEXT
+               OpExtension "SPV_EXT_descriptor_heap"
+               OpExtension "SPV_KHR_untyped_pointers"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %resource_heap
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %resource_heap BuiltIn ResourceHeapEXT
+               OpDecorate %Heap Block
+               OpMemberDecorate %Heap 0 Offset 0
+               ; layout(descriptor_heap) buffer Heap { uint data; } heap[3][3]
+               ; but the outer array has the wrong stride
+               OpDecorateId %out_array ArrayStrideIdEXT %buf_size
+               OpDecorateId %in_array ArrayStrideIdEXT %buf_size
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+       %uint = OpTypeInt 32 0
+      %uint_0 = OpConstant %uint 0
+      %uint_1 = OpConstant %uint 1
+      %uint_2 = OpConstant %uint 2
+      %uint_3 = OpConstant %uint 3
+    %uint_42 = OpConstant %uint 42
+%_ptr_UniformConstant = OpTypeUntypedPointerKHR UniformConstant
+%resource_heap = OpUntypedVariableKHR %_ptr_UniformConstant UniformConstant
+       %Heap = OpTypeStruct %uint
+%_ptr_StorageBuffer = OpTypeUntypedPointerKHR StorageBuffer
+   %buf_type = OpTypeBufferEXT StorageBuffer
+   %buf_size = OpConstantSizeOfEXT %uint %buf_type
+ %in_array = OpTypeArray %buf_type %uint_3
+%out_array = OpTypeArray %in_array %uint_3
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %15 = OpUntypedAccessChainKHR %_ptr_UniformConstant %out_array %resource_heap %uint_1 %uint_2
+         %19 = OpBufferPointerEXT %_ptr_StorageBuffer %15
+         %20 = OpUntypedAccessChainKHR %_ptr_StorageBuffer %Heap %19 %uint_0
+               OpStore %20 %uint_42
+               OpReturn
+               OpFunctionEnd
+  )";
+  spvValidatorOptionsSetBufferDescriptorLayout(options_, 64u, 64u);
+  CompileSuccessfully(str.c_str(), SPV_ENV_VULKAN_1_4);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_4));
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("Array stride 64 is smaller than element type size 192"));
 }
 
 TEST_F(ValidateSpvEXTDescriptorHeap, ArrayStrideFloat) {
