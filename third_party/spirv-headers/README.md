@@ -25,7 +25,7 @@ not tied to SPIR-V specification versions.
 ## How is this repository updated?
 
 When a new version or revision of the SPIR-V specification is published,
-the SPIR-V Working Group will push new commits onto master, updating
+the SPIR-V Working Group will push new commits onto the `main` branch, updating
 the files under [include](include).
 
 [The SPIR-V XML registry file](include/spirv/spir-v.xml)
@@ -92,9 +92,9 @@ See also the [example](example/) subdirectory.  But since that example is
 A Bazel-based project can use the headers without installing, as follows:
 
 1. Add SPIRV-Headers as a submodule of your project, and add a
-`local_repository` to your `WORKSPACE` file. For example, if you place
+`local_repository` to your `MODULE.bazel` file. For example, if you place
 SPIRV-Headers under `external/spirv-headers`, then add the following to your
-`WORKSPACE` file:
+`MODULE.bazel` file:
 
 ```
 local_repository(
@@ -199,6 +199,41 @@ python3 bin/makeExtinstHeaders.py
   Extended instruction sets evolve asynchronously from the core spec.
   Right now there is only a single version of both the GLSL and OpenCL
   headers.  So we don't yet have a problematic example to resolve.
+
+* *How and when is this repo tagged?*
+
+  Because there are many users of the SPIR-V headers, this repo is tagged using
+  several tagging conventions:
+
+  1. For each Vulkan SDK release, the repo is tagged with the Vulkan SDK version
+     to record the SPIR-V headers used by that version of the Vulkan SDK.  For
+     example, the tag `vulkan-sdk-1.X.YYY.Z` indicates the SPIR-V headers that
+     were included in the Vulkan SDK version `1.X.YYY.Z`.
+  2. For other uses, the repo is tagged on an as-needed basis using a scheme
+     that uses both [Semantic Versioning](https://semver.org)
+     and [Calendar Versioning](https://calver.org) conventions.
+
+     The tag is of the form:
+
+         v1.YYYY0M.R
+
+     representing version number `1.YYYY0M.R`:
+
+     * The first numbered component is `1`:
+         * This fits with Semantic Versioning because updates should always be
+             backward compatible. Keeping the major version fixed reduces churn
+             for downstream users when they pull in a new release of
+             SPIRV-Headers.
+         * If the project needs to break backward compatibiliy, then the `1`
+             will be incremented.
+     * The next components are date-based, following Calendar Versioning
+       conventions:
+         * `YYYY0M`: A four-digit year, and a two-digit zero-padded month
+             number.
+         * `R`: A release number, incremented as needed within the month.
+
+  3. Other, older tagging conventions previously existed in this repo, but are
+     no longer actively used.
 
 ## License
 <a name="license"></a>

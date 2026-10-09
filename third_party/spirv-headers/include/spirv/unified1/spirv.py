@@ -10,7 +10,7 @@
 # the Binary Section of the SPIR-V specification.
 
 # Enumeration tokens for SPIR-V, in various styles:
-#   C, C++, C++11, JSON, Lua, Python, C#, D, Beef
+#   C, C++, C++11, JSON, Lua, Python, C#, Java, D, Beef
 # 
 # - C will have tokens with a "Spv" prefix, e.g.: SpvSourceLanguageGLSL
 # - C++ will have tokens in the "spv" name space, e.g.: spv::SourceLanguageGLSL
@@ -19,6 +19,8 @@
 # - Python will use dictionaries, e.g.: spv['SourceLanguage']['GLSL']
 # - C# will use enum classes in the Specification class located in the "Spv" namespace,
 #     e.g.: Spv.Specification.SourceLanguage.GLSL
+# - Java will use enum classes in the Spv class in the org.khronos.spv package,
+#     e.g.: Spv.SourceLanguage.GLSL
 # - D will have tokens under the "spv" module, e.g: spv.SourceLanguage.GLSL
 # - Beef will use enum classes in the Specification class located in the "Spv" namespace,
 #     e.g.: Spv.Specification.SourceLanguage.GLSL
@@ -147,6 +149,8 @@ spv = {
         'RoundingModeRTZ' : 4463,
         'NonCoherentTileAttachmentReadQCOM' : 4489,
         'TileShadingRateQCOM' : 4490,
+        'SubgroupSizeHalfQCOM' : 4507,
+        'SubgroupSizeFullQCOM' : 4508,
         'EarlyAndLateFragmentTestsAMD' : 5017,
         'StencilRefReplacingEXT' : 5027,
         'CoalescingAMDX' : 5069,
@@ -562,6 +566,7 @@ spv = {
         'BindlessImageNV' : 5399,
         'BoundSamplerNV' : 5400,
         'BoundImageNV' : 5401,
+        'CooperativeMatrixTransposeEXT' : 5440,
         'SIMTCallINTEL' : 5599,
         'ReferencedIndirectlyINTEL' : 5602,
         'ClobberINTEL' : 5607,
@@ -1158,6 +1163,8 @@ spv = {
         'TileShadingQCOM' : 4495,
         'CooperativeMatrixConversionQCOM' : 4496,
         'TextureBlockMatch2QCOM' : 4498,
+        'BFloat16MulAddQCOM' : 4504,
+        'SubgroupSizeQCOM' : 4506,
         'MultipleWaitQueuesQCOM' : 4539,
         'ImageGatherLinearQCOM' : 4543,
         'ImageGatherExtendedModesQCOM' : 4544,
@@ -1258,13 +1265,17 @@ spv = {
         'PushConstantBanksNV' : 5423,
         'LongVectorEXT' : 5425,
         'Shader64BitIndexingEXT' : 5426,
+        'CooperativeMatrixConversionsEXT' : 5429,
+        'CooperativeMatrixReductionsEXT' : 5430,
         'CooperativeMatrixReductionsNV' : 5430,
         'CooperativeMatrixConversionsNV' : 5431,
+        'CooperativeMatrixPerElementOperationsEXT' : 5432,
         'CooperativeMatrixPerElementOperationsNV' : 5432,
         'CooperativeMatrixTensorAddressingNV' : 5433,
         'CooperativeMatrixBlockLoadsNV' : 5434,
         'CooperativeVectorTrainingNV' : 5435,
         'RayTracingClusterAccelerationStructureNV' : 5437,
+        'CooperativeMatrixGetCoordinateEXT' : 5438,
         'TensorAddressingNV' : 5439,
         'CooperativeMatrixDecodeVectorNV' : 5447,
         'SubgroupShuffleINTEL' : 5568,
@@ -2109,6 +2120,7 @@ spv = {
         'OpImageBlockMatchWindowSADQCOM' : 4501,
         'OpImageBlockMatchGatherSSDQCOM' : 4502,
         'OpImageBlockMatchGatherSADQCOM' : 4503,
+        'OpBFloat16MulAddQCOM' : 4505,
         'OpCompositeConstructCoopMatQCOM' : 4540,
         'OpCompositeExtractCoopMatQCOM' : 4541,
         'OpExtractSubArrayQCOM' : 4542,
@@ -2185,6 +2197,7 @@ spv = {
         'OpCooperativeVectorReduceSumAccumulateNV' : 5291,
         'OpCooperativeVectorMatrixMulAddNV' : 5292,
         'OpCooperativeMatrixConvertNV' : 5293,
+        'OpCooperativeMatrixConvertUseEXT' : 5293,
         'OpEmitMeshTasksEXT' : 5294,
         'OpSetMeshOutputsEXT' : 5295,
         'OpGroupNonUniformPartitionEXT' : 5296,
@@ -2249,11 +2262,14 @@ spv = {
         'OpCooperativeMatrixStoreNV' : 5360,
         'OpCooperativeMatrixMulAddNV' : 5361,
         'OpCooperativeMatrixLengthNV' : 5362,
+        'OpCooperativeMatrixGetCoordinateEXT' : 5363,
         'OpBeginInvocationInterlockEXT' : 5364,
         'OpEndInvocationInterlockEXT' : 5365,
+        'OpCooperativeMatrixReduceEXT' : 5366,
         'OpCooperativeMatrixReduceNV' : 5366,
         'OpCooperativeMatrixLoadTensorNV' : 5367,
         'OpCooperativeMatrixStoreTensorNV' : 5368,
+        'OpCooperativeMatrixPerElementOpEXT' : 5369,
         'OpCooperativeMatrixPerElementOpNV' : 5369,
         'OpTypeTensorLayoutNV' : 5370,
         'OpTypeTensorViewNV' : 5371,

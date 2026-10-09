@@ -5385,6 +5385,20 @@
       "version" : "None"
     },
     {
+      "opname" : "OpBFloat16MulAddQCOM",
+      "class"  : "Arithmetic",
+      "opcode" : 4505,
+      "operands" : [
+        { "kind" : "IdResultType" },
+        { "kind" : "IdResult" },
+        { "kind" : "IdRef", "name" : "Operand 1" },
+        { "kind" : "IdRef", "name" : "Operand 2" },
+        { "kind" : "IdRef", "name" : "Operand 3" }
+      ],
+      "capabilities" : [ "BFloat16MulAddQCOM" ],
+      "version" : "None"
+    },
+    {
       "opname" : "OpCompositeConstructCoopMatQCOM",
       "class"  : "Composite",
       "opcode" : 4540,
@@ -6407,7 +6421,8 @@
       "version" : "None"
     },
     {
-      "opname" : "OpCooperativeMatrixConvertNV",
+      "opname" : "OpCooperativeMatrixConvertUseEXT",
+      "aliases" : ["OpCooperativeMatrixConvertNV"],
       "class"  : "Conversion",
       "opcode" : 5293,
       "operands" : [
@@ -6415,7 +6430,7 @@
         { "kind" : "IdResult" },
         { "kind" : "IdRef",             "name" : "Matrix" }
       ],
-      "capabilities" : [ "CooperativeMatrixConversionsNV" ],
+      "capabilities" : [ "CooperativeMatrixConversionsEXT", "CooperativeMatrixConversionsNV" ],
       "version" : "None"
     },
     {
@@ -7254,6 +7269,19 @@
       "version" : "None"
     },
     {
+      "opname" : "OpCooperativeMatrixGetCoordinateEXT",
+      "class"  : "Miscellaneous",
+      "opcode" : 5363,
+      "operands" : [
+        { "kind" : "IdResultType" },
+        { "kind" : "IdResult" },
+        { "kind" : "IdRef",        "name" : "Matrix" },
+        { "kind" : "IdRef",        "name" : "Index" }
+      ],
+      "capabilities" : [ "CooperativeMatrixGetCoordinateEXT" ],
+      "version" : "None"
+    },
+    {
       "opname" : "OpBeginInvocationInterlockEXT",
       "class"  : "Reserved",
       "opcode" : 5364,
@@ -7270,8 +7298,9 @@
       "version" : "None"
     },
     {
-      "opname" : "OpCooperativeMatrixReduceNV",
-      "class"  : "Arithmetic",
+      "opname" : "OpCooperativeMatrixReduceEXT",
+      "aliases" : ["OpCooperativeMatrixReduceNV"],
+      "class"  : "Function",
       "opcode" : 5366,
       "operands" : [
         { "kind" : "IdResultType" },
@@ -7280,7 +7309,7 @@
         { "kind" : "CooperativeMatrixReduce",      "name" : "Reduce" },
         { "kind" : "IdRef", "name" : "CombineFunc" }
       ],
-      "capabilities" : [ "CooperativeMatrixReductionsNV" ],
+      "capabilities" : [ "CooperativeMatrixReductionsEXT" ],
       "version" : "None"
     },
     {
@@ -7314,7 +7343,8 @@
       "version" : "None"
     },
     {
-      "opname" : "OpCooperativeMatrixPerElementOpNV",
+      "opname" : "OpCooperativeMatrixPerElementOpEXT",
+      "aliases" : ["OpCooperativeMatrixPerElementOpNV"],
       "class"  : "Function",
       "opcode" : 5369,
       "operands" : [
@@ -7324,7 +7354,7 @@
         { "kind" : "IdRef", "name" : "Func" },
         { "kind" : "IdRef",        "quantifier" : "*", "name" : "Operands" }
       ],
-      "capabilities" : [ "CooperativeMatrixPerElementOperationsNV" ],
+      "capabilities" : [ "CooperativeMatrixPerElementOperationsEXT" ],
       "version" : "None"
     },
     {
@@ -13279,6 +13309,18 @@
           "version": "None"
         },
         {
+          "enumerant" : "SubgroupSizeHalfQCOM",
+          "value" : 4507,
+          "capabilities" : [ "SubgroupSizeQCOM" ],
+          "version" : "None"
+        },
+        {
+          "enumerant" : "SubgroupSizeFullQCOM",
+          "value" : 4508,
+          "capabilities" : [ "SubgroupSizeQCOM" ],
+          "version" : "None"
+        },
+        {
           "enumerant": "EarlyAndLateFragmentTestsAMD",
           "value": 5017,
           "capabilities": [ "Shader" ],
@@ -15400,6 +15442,12 @@
           "enumerant" : "BoundImageNV",
           "value" : 5401,
           "capabilities" : [ "BindlessTextureNV" ],
+          "version" : "None"
+        },
+        {
+          "enumerant" : "CooperativeMatrixTransposeEXT",
+          "value" : 5440,
+          "capabilities" : [ "CooperativeMatrixConversionsEXT" ],
           "version" : "None"
         },
         {
@@ -17715,6 +17763,18 @@
           "version" : "None"
         },
         {
+          "enumerant" : "BFloat16MulAddQCOM",
+          "value" : 4504,
+          "extensions" : [ "SPV_QCOM_bfloat16_muladd" ],
+          "version" : "None"
+        },
+        {
+          "enumerant" : "SubgroupSizeQCOM",
+          "value" : 4506,
+          "extensions" : [ "SPV_QCOM_subgroup_size" ],
+          "version" : "None"
+        },
+        {
           "enumerant" : "MultipleWaitQueuesQCOM",
           "value" : 4539,
           "extensions" : [ "SPV_QCOM_multiple_wait_queues" ],
@@ -18256,9 +18316,16 @@
           "version" : "None"
         },
         {
-          "enumerant" : "CooperativeMatrixReductionsNV",
+          "enumerant" : "CooperativeMatrixConversionsEXT",
+          "value" : 5429,
+          "extensions" : [ "SPV_EXT_cooperative_matrix_maintenance1" ],
+          "version" : "None"
+        },
+        {
+          "enumerant" : "CooperativeMatrixReductionsEXT",
+          "aliases" : ["CooperativeMatrixReductionsNV"],
           "value" : 5430,
-          "extensions" : [ "SPV_NV_cooperative_matrix2" ],
+          "extensions" : [ "SPV_EXT_cooperative_matrix_maintenance1", "SPV_NV_cooperative_matrix2" ],
           "version" : "None"
         },
         {
@@ -18268,9 +18335,10 @@
           "version" : "None"
         },
         {
-          "enumerant" : "CooperativeMatrixPerElementOperationsNV",
+          "enumerant" : "CooperativeMatrixPerElementOperationsEXT",
+          "aliases" : ["CooperativeMatrixPerElementOperationsNV"],
           "value" : 5432,
-          "extensions" : [ "SPV_NV_cooperative_matrix2" ],
+          "extensions" : [ "SPV_EXT_cooperative_matrix_maintenance1", "SPV_NV_cooperative_matrix2" ],
           "version" : "None"
         },
         {
@@ -18296,6 +18364,12 @@
           "value" : 5437,
           "capabilities" : [ "RayTracingKHR" ],
           "extensions" : [ "SPV_NV_cluster_acceleration_structure" ],
+          "version" : "None"
+        },
+        {
+          "enumerant" : "CooperativeMatrixGetCoordinateEXT",
+          "value" : 5438,
+          "extensions" : [ "SPV_EXT_cooperative_matrix_maintenance1" ],
           "version" : "None"
         },
         {
